@@ -8,11 +8,13 @@ Autore:
 Marco Cantù
 
 Versione:
-0.2.0
+0.3.0
 ==========================================================
 """
 
 from dataclasses import dataclass, field
+from datetime import datetime
+import uuid
 
 
 @dataclass
@@ -27,9 +29,19 @@ class Project:
     # Informazioni generali
     # ---------------------------------------------------------
 
+    project_id: str = field(default_factory=lambda: str(uuid.uuid4()))
+
     name: str = "Untitled"
 
     project_folder: str = ""
+
+    created: str = field(
+        default_factory=lambda: datetime.now().isoformat(timespec="seconds")
+    )
+
+    modified: str = field(
+        default_factory=lambda: datetime.now().isoformat(timespec="seconds")
+    )
 
     # ---------------------------------------------------------
     # Risorse importate
@@ -44,5 +56,7 @@ class Project:
     landmarks: list = field(default_factory=list)
 
     meshes: list = field(default_factory=list)
+
+    textures: list = field(default_factory=list)
 
     exports: list = field(default_factory=list)

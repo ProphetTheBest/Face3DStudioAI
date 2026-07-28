@@ -33,7 +33,16 @@ def main():
     # Crea il controller principale
     #
     app_controller = ApplicationController()
+    
+    # # -----------------------------
+    # # TEST TEMPORANEO
+    # # -----------------------------
 
+    # app_controller.get_project_manager().new_project("Test Project")
+
+    # app_controller.get_project_manager().save_project(
+    #     r"C:\Users\Marco\Desktop\TestProject.face3d"
+    # )
     #
     # Crea la finestra principale
     #
