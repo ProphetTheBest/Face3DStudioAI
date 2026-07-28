@@ -1,26 +1,46 @@
-import sys
+"""
+==========================================================
+Face3D Studio AI
 
-print("1 - Avvio")
+File: app.py
+
+Punto di ingresso dell'applicazione.
+
+Autore:
+Marco Cantù
+
+Versione:
+0.2.0
+==========================================================
+"""
+
+import sys
 
 from PySide6.QtWidgets import QApplication
 
-print("2 - PySide6 OK")
-
+from source.controllers.application_controller import ApplicationController
 from source.gui.main_window import MainWindow
 
-print("3 - MainWindow importata")
 
 def main():
-    print("4 - Creo QApplication")
+    """
+    Punto di ingresso dell'applicazione.
+    """
+
     app = QApplication(sys.argv)
 
-    print("5 - Creo MainWindow")
-    window = MainWindow()
+    #
+    # Crea il controller principale
+    #
+    app_controller = ApplicationController()
 
-    print("6 - Mostro finestra")
+    #
+    # Crea la finestra principale
+    #
+    window = MainWindow(app_controller)
+
     window.show()
 
-    print("7 - Entro nel loop")
     sys.exit(app.exec())
 
 
