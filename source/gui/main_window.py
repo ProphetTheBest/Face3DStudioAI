@@ -12,19 +12,21 @@ Autore:
 Marco Cantù
 
 Versione:
-0.0.5
+0.0.9
 ==========================================================
 """
 
 from PySide6.QtGui import QAction
+
 from PySide6.QtWidgets import (
+    QDialog,
     QFileDialog,
-    QInputDialog,
     QMainWindow,
     QMessageBox,
 )
 
 from source.controllers.application_controller import ApplicationController
+from source.dialogs.new_project_dialog import NewProjectDialog
 from source.widgets.central_widget import CentralWidget
 
 
@@ -58,19 +60,21 @@ class MainWindow(QMainWindow):
 
         menu_bar = self.menuBar()
 
-        #
-        # File
-        #
         file_menu = menu_bar.addMenu("&File")
 
         self.action_new_project = QAction("New Project...", self)
         self.action_open_project = QAction("Open Project...", self)
+        self.action_import_photos = QAction("Import Photos...", self)
         self.action_save_project = QAction("Save", self)
         self.action_save_project_as = QAction("Save As...", self)
         self.action_exit = QAction("Exit", self)
 
         file_menu.addAction(self.action_new_project)
         file_menu.addAction(self.action_open_project)
+
+        file_menu.addSeparator()
+
+        file_menu.addAction(self.action_import_photos)
 
         file_menu.addSeparator()
 
@@ -81,20 +85,22 @@ class MainWindow(QMainWindow):
 
         file_menu.addAction(self.action_exit)
 
-        #
-        # Collegamenti
-        #
         self.action_new_project.triggered.connect(
             self._on_new_project
+        )
+
+        self.action_open_project.triggered.connect(
+            self._on_open_project
+        )
+
+        self.action_import_photos.triggered.connect(
+            self._on_import_photos
         )
 
         self.action_exit.triggered.connect(
             self.close
         )
 
-        #
-        # Altri menu
-        #
         menu_bar.addMenu("&Edit")
         menu_bar.addMenu("&View")
         menu_bar.addMenu("&AI")
@@ -128,57 +134,143 @@ class MainWindow(QMainWindow):
         Gestisce il comando File -> New Project.
         """
 
-        project_name, ok = QInputDialog.getText(
-            self,
-            "New Project",
-            "Project name:"
-        )
+        dialog = NewProjectDialog(self)
 
-        if not ok:
+        if dialog.exec() != QDialog.Accepted:
             return
 
-        project_name = project_name.strip()
+        project_name = dialog.project_name()
+        project_folder = dialog.project_folder()
 
-        if not project_name:
+        project_controller = (
+            self.app_controller.get_project_controller()
+        )
+
+        try:
+
+            project_controller.create_project(
+                project_name,
+                project_folder,
+            )
+
+            self.central_widget.project_panel.refresh()
+
+            self.status_bar.showMessage(
+                "Project created",
+                3000
+            )
+
+            QMessageBox.information(
+                self,
+                "Face3D Studio AI",
+                f"Project created successfully.\n\n{project_folder}"
+            )
+
+        except Exception as e:
+
+            QMessageBox.critical(
+                self,
+                "Error",
+                str(e)
+            )
+
+            raise
+
+    # -----------------------------------------------------
+
+    def _on_open_project(self) -> None:
+        """
+        Gestisce il comando File -> Open Project.
+        """
+
+        project_folder = QFileDialog.getExistingDirectory(
+            self,
+            "Open Project"
+        )
+
+        if not project_folder:
+            return
+
+        project_controller = (
+            self.app_controller.get_project_controller()
+        )
+
+        try:
+
+            project_controller.open_project(
+                project_folder
+            )
+
+            self.central_widget.project_panel.refresh()
+
+            QMessageBox.information(
+                self,
+                "Face3D Studio AI",
+                "Project loaded successfully."
+            )
+
+        except Exception as e:
+
+            QMessageBox.critical(
+                self,
+                "Error",
+                str(e)
+            )
+
+            raise
+
+    # -----------------------------------------------------
+
+    def _on_import_photos(self) -> None:
+        """
+        Gestisce il comando File -> Import Photos.
+        """
+
+        project_controller = (
+            self.app_controller.get_project_controller()
+        )
+
+        if project_controller.get_project() is None:
+
             QMessageBox.warning(
                 self,
                 "Face3D Studio AI",
-                "Project name cannot be empty."
+                "Create or open a project before importing photos."
             )
+
             return
 
-        #
-        # Selezione cartella
-        #
-        parent_folder = QFileDialog.getExistingDirectory(
+        file_list, _ = QFileDialog.getOpenFileNames(
             self,
-            "Select destination folder"
+            "Import Photos",
+            "",
+            "Images (*.jpg *.jpeg *.png *.bmp *.tif *.tiff)"
         )
 
-        if not parent_folder:
+        if not file_list:
             return
 
-        #
-        # Crea il progetto
-        #
-        self.app_controller.get_project_manager().new_project(project_name)
-
-        #
-        # Percorso finale
-        #
-        project_folder = (
-            f"{parent_folder}/{project_name}.face3d"
+        photo_controller = (
+            self.app_controller.get_photo_controller()
         )
 
-        #
-        # Salvataggio
-        #
-        self.app_controller.get_project_manager().save_project(
-            project_folder
-        )
+        try:
 
-        QMessageBox.information(
-            self,
-            "Face3D Studio AI",
-            "Project created successfully."
-        )
+            photo_controller.import_photos(file_list)
+
+            self.central_widget.project_panel.refresh()
+
+            self.status_bar.showMessage(
+                f"{len(file_list)} photo(s) imported.",
+                3000
+            )
+
+        except Exception as e:
+
+            QMessageBox.critical(
+                self,
+                "Error",
+                str(e)
+            )
+
+            raise

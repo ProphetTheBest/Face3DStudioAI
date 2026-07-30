@@ -8,44 +8,80 @@ Autore:
 Marco Cantù
 
 Versione:
-0.2.0
+0.5.0
 ==========================================================
 """
 
 from source.models.project import Project
+from source.services.project.project_manager import ProjectManager
 
 
 class ProjectController:
     """
     Controller del progetto.
 
-    Gestisce tutte le operazioni
-    sul Project Model.
+    Coordina la logica relativa al progetto e rappresenta
+    il punto di accesso della GUI per tutte le operazioni
+    sul progetto.
     """
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        project_manager: ProjectManager,
+    ) -> None:
 
-        self.project = Project()
+        self._project_manager = project_manager
 
     # ---------------------------------------------------------
     # Gestione progetto
     # ---------------------------------------------------------
 
-    def new_project(self, name: str = "Untitled") -> None:
+    def create_project(
+        self,
+        project_name: str,
+        project_folder: str,
+    ) -> None:
+        """
+        Crea un nuovo progetto.
+        """
 
-        self.project = Project(name=name)
+        self._project_manager.new_project(project_name)
+        self._project_manager.save_project(project_folder)
 
     # ---------------------------------------------------------
 
-    def get_project(self) -> Project:
+    def open_project(
+        self,
+        project_folder: str,
+    ) -> None:
+        """
+        Apre un progetto esistente.
+        """
 
-        return self.project
+        self._project_manager.open_project(project_folder)
+
+    # ---------------------------------------------------------
+
+    def get_project(self) -> Project | None:
+        """
+        Restituisce il progetto corrente.
+        """
+
+        return self._project_manager.current_project
 
     # ---------------------------------------------------------
 
     def get_project_name(self) -> str:
+        """
+        Restituisce il nome del progetto corrente.
+        """
 
-        return self.project.name
+        project = self.get_project()
+
+        if project is None:
+            return "Untitled"
+
+        return project.name
 
     # ---------------------------------------------------------
     # Conteggi
@@ -53,34 +89,46 @@ class ProjectController:
 
     def get_photo_count(self) -> int:
 
-        return len(self.project.photos)
+        project = self.get_project()
+
+        return len(project.photos) if project else 0
 
     # ---------------------------------------------------------
 
     def get_video_count(self) -> int:
 
-        return len(self.project.videos)
+        project = self.get_project()
+
+        return len(project.videos) if project else 0
 
     # ---------------------------------------------------------
 
     def get_frame_count(self) -> int:
 
-        return len(self.project.frames)
+        project = self.get_project()
+
+        return len(project.frames) if project else 0
 
     # ---------------------------------------------------------
 
     def get_landmark_count(self) -> int:
 
-        return len(self.project.landmarks)
+        project = self.get_project()
+
+        return len(project.landmarks) if project else 0
 
     # ---------------------------------------------------------
 
     def get_mesh_count(self) -> int:
 
-        return len(self.project.meshes)
+        project = self.get_project()
+
+        return len(project.meshes) if project else 0
 
     # ---------------------------------------------------------
 
     def get_export_count(self) -> int:
 
-        return len(self.project.exports)
+        project = self.get_project()
+
+        return len(project.exports) if project else 0

@@ -16,6 +16,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 import uuid
 
+from source.models.photo import Photo
+
 
 @dataclass
 class Project:
@@ -47,7 +49,7 @@ class Project:
     # Risorse importate
     # ---------------------------------------------------------
 
-    photos: list = field(default_factory=list)
+    photos: list[Photo] = field(default_factory=list)
 
     videos: list = field(default_factory=list)
 
@@ -60,3 +62,13 @@ class Project:
     textures: list = field(default_factory=list)
 
     exports: list = field(default_factory=list)
+
+    # ---------------------------------------------------------
+    # Gestione fotografie
+    # ---------------------------------------------------------
+
+    def add_photo(self, photo: Photo) -> None:
+        """
+        Aggiunge una fotografia al progetto.
+        """
+        self.photos.append(photo)

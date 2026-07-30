@@ -34,11 +34,11 @@ class ProjectPanel(BasePanel):
 
         self.add_content_widget(self.tree)
 
-        self._refresh_view()
+        self.refresh
 
     # ---------------------------------------------------------
 
-    def _refresh_view(self) -> None:
+    def refresh(self) -> None:
         """
         Aggiorna la vista leggendo i dati dal controller.
         """

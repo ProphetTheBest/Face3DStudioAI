@@ -1,12 +1,12 @@
 # Face3D Studio AI
 
-## PROJECT MASTER PLAN
+# PROJECT MASTER PLAN
 
 **Autore:** Marco Cantù
 
-**Versione documento:** 1.0
+**Versione documento:** 1.1
 
-**Ultimo aggiornamento:** 28 Luglio 2026
+**Ultimo aggiornamento:** 29 Luglio 2026
 
 ---
 
@@ -45,30 +45,42 @@ del codice.
 
 # 3. Architettura
 
-Il progetto utilizza il pattern MVC.
+Il progetto adotta un'architettura MVC estesa.
 
 ```
-                app.py
-                   │
-                   ▼
-       ApplicationController
-                   │
-                   ▼
-              MainWindow
-                   │
-                   ▼
-            CentralWidget
-                   │
-      ┌────────────┼────────────┐
-      ▼            ▼            ▼
- ProjectPanel  ViewerPanel  PropertiesPanel
-      │
-      ▼
-ProjectController
-      │
-      ▼
- Project Model
+GUI
+│
+▼
+ApplicationController
+│
+├── ProjectController
+├── PhotoController
+├── VideoController
+└── ...
+
+│
+▼
+
+Manager
+│
+├── ProjectManager
+├── PhotoManager
+├── VideoManager
+└── ...
+
+│
+▼
+
+Model
 ```
+
+### Regole architetturali
+
+- La GUI non contiene logica di business.
+- La GUI comunica esclusivamente con i Controller.
+- I Controller coordinano i Manager.
+- I Manager operano sui Model.
+- Nessun Widget conosce direttamente Manager o Model.
 
 ---
 
@@ -79,6 +91,7 @@ source/
 
 controllers/
 models/
+managers/
 widgets/
 services/
 utils/
@@ -89,35 +102,35 @@ resources/
 
 # 5. Tecnologie
 
-Linguaggio
+## Linguaggio
 
 - Python
 
-GUI
+## GUI
 
 - PySide6
 
-Computer Vision
+## Computer Vision
 
 - OpenCV
 
-AI
+## AI
 
 - MediaPipe
-- ONNX Runtime
 - InsightFace
+- ONNX Runtime
 - PyTorch (se necessario)
 
-3D
+## 3D
 
 - Open3D
 - Trimesh
 
-File
+## File
 
 - JSON
 
-Versionamento
+## Versionamento
 
 - Git
 - GitHub
@@ -134,7 +147,10 @@ Versionamento
 - Dependency Injection
 - Codice modulare
 - Nessuna duplicazione
-- Test ad ogni milestone
+- Un solo step di sviluppo alla volta
+- Test al termine di ogni modifica
+- Chiusura formale di ogni milestone
+- Aggiornamento della documentazione prima del commit
 
 ---
 
@@ -148,91 +164,99 @@ Versionamento
 
 ## M0.2
 
-✔ BasePanel
-
-✔ MainWindow
-
-✔ CentralWidget
+✔ Interfaccia grafica di base
 
 ---
 
 ## M0.3
 
 ✔ MVC
-
 ✔ ApplicationController
-
-✔ ProjectController
-
 ✔ Project Explorer
-
-✔ GitHub
 
 ---
 
 ## M0.4
 
-⏳ Project Manager
+✔ Gestione progetti
+
+- Nuovo progetto
+- Apertura progetto
+- Salvataggio progetto
+- Struttura cartelle
 
 ---
 
 ## M0.5
 
-□ Import immagini
+✔ Gestione fotografie
+
+- Importazione multipla
+- Copia nella cartella del progetto
+- Persistenza completa
+- Apertura corretta del progetto
 
 ---
 
-## M0.6
+## M0.6 (Corrente)
 
-□ Import video
+□ Project Explorer avanzato
+
+Obiettivi:
+
+- Espandere il nodo Photos
+- Elencare le fotografie
+- Selezionare una fotografia
+- Mostrare l'immagine nel Viewer
+- Aggiornare il Properties Panel
 
 ---
 
 ## M0.7
 
-□ Face Detection
+□ Gestione Video
 
 ---
 
 ## M0.8
 
-□ Landmark Detection
+□ Face Detection
 
 ---
 
 ## M0.9
 
-□ Camera Calibration
+□ Landmark Detection
 
 ---
 
 ## M1.0
 
-□ Ricostruzione Mesh
+□ Camera Calibration
 
 ---
 
 ## M1.1
 
-□ Mesh Cleaning
+□ Ricostruzione Mesh
 
 ---
 
 ## M1.2
 
-□ Texture Mapping
+□ Mesh Cleaning
 
 ---
 
 ## M1.3
 
-□ Export STL OBJ PLY
+□ Texture Mapping
 
 ---
 
 ## M1.4
 
-□ AI Enhancement
+□ Esportazione modelli 3D
 
 ---
 
@@ -248,41 +272,65 @@ Versionamento
 
 Introduzione di ApplicationController.
 
-Motivazione:
+**Motivazione**
 
-Centralizzare la gestione dei controller evitando dipendenze dirette tra View
-e Model.
+Centralizzare la gestione dell'applicazione.
 
 ---
 
 ## ADR-002
 
-ProjectTreeWidget non conosce ProjectController.
+I Widget non conoscono Controller, Manager o Model diversi da quelli strettamente necessari.
 
-Motivazione:
+**Motivazione**
 
-Separazione tra interfaccia grafica e logica applicativa.
+Separazione tra GUI e logica applicativa.
+
+---
+
+## ADR-003
+
+Pattern architetturale
+
+GUI → Controller → Manager → Model
+
+**Motivazione**
+
+Massima separazione delle responsabilità.
 
 ---
 
 # 9. Milestone Corrente
 
-M0.4
+## M0.6
 
-Project Manager
+### Project Explorer avanzato
 
-Attività:
+Obiettivo:
 
-- Nuovo progetto
-- Apri progetto
-- Salva progetto
-- Salva con nome
-- Chiudi progetto
-- Recent Projects
+Trasformare il Project Explorer da semplice riepilogo del progetto
+a browser completo delle risorse.
+
+Attività previste:
+
+- Espansione nodo Photos
+- Visualizzazione miniature/elenco
+- Selezione fotografia
+- Viewer sincronizzato
+- Properties Panel sincronizzato
 
 ---
 
 # 10. Registro Versioni
+
+## v0.5.0
+
+- M0.5 completata
+- Gestione fotografie completata
+- Persistenza del progetto completata
+- Refactoring Controller/Manager completato
+
+---
 
 ## v0.3.1
 
@@ -290,5 +338,4 @@ Attività:
 - Refactoring CentralWidget
 - MVC completato
 - Dependency Injection
-- Project Explorer completato
-- Repository GitHub configurato
+- Repository GitHub

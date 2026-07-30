@@ -10,7 +10,7 @@ from typing import Optional
 
 from source.models.project import Project
 from source.services.project.project_saver import ProjectSaver
-
+from source.services.project.project_loader import ProjectLoader
 
 class ProjectManager:
     """
@@ -21,11 +21,12 @@ class ProjectManager:
 
         self._current_project: Optional[Project] = None
         self._project_saver = ProjectSaver()
+        self._project_loader = ProjectLoader()
 
     # ---------------------------------------------------------
     # Proprietà
     # ---------------------------------------------------------
-
+    
     @property
     def current_project(self) -> Optional[Project]:
         """
@@ -58,13 +59,25 @@ class ProjectManager:
         if self._current_project is None:
             raise RuntimeError("Nessun progetto aperto.")
 
+        self._current_project.project_folder = project_folder
+
         self._project_saver.save(
             self._current_project,
             project_folder
         )
 
     # ---------------------------------------------------------
+    def open_project(self, project_folder: str) -> Project:
+        """
+        Apre un progetto esistente.
+        """
 
+        project = self._project_loader.load(project_folder)
+
+        self._current_project = project
+
+        return project
+    
     def set_current_project(self, project: Project) -> None:
 
         self._current_project = project
