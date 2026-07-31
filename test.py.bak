@@ -1,0 +1,11 @@
+from source.services.asset.image_importer import ImageImporter
+
+importer = ImageImporter()
+
+asset = importer.import_image(
+    r"C:\Immagini\foto.jpeg",
+    r"C:\Progetti\TestProject"
+)
+
+print(asset.name)
+print(asset.relative_path)

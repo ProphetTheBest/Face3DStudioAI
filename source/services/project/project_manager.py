@@ -12,7 +12,7 @@ Autore:
 Marco Cantù
 
 Versione:
-1.1.0
+1.2.0
 ==========================================================
 """
 
@@ -23,6 +23,9 @@ from typing import Optional
 
 from source.models.assets.asset import Asset
 from source.models.project import Project
+from source.services.project.project_constants import (
+    PROJECT_EXTENSION,
+)
 from source.services.project.project_loader import ProjectLoader
 from source.services.project.project_saver import ProjectSaver
 
@@ -65,7 +68,7 @@ class ProjectManager:
 
         project = self.new_project(name)
 
-        final_folder = Path(project_folder) / name
+        final_folder = Path(project_folder) / f"{name}{PROJECT_EXTENSION}"
 
         self.save_project(str(final_folder))
 

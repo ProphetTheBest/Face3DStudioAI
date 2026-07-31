@@ -10,7 +10,7 @@ Autore:
 Marco Cantù
 
 Versione:
-0.1.0
+0.2.0
 ==========================================================
 """
 
@@ -19,12 +19,13 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from source.models.assets.asset import Asset
 from source.models.project import Project
-from source.models.photo import Photo
 
 from source.services.project.project_constants import (
     PROJECT_FILE,
 )
+
 
 class ProjectLoader:
     """
@@ -57,27 +58,25 @@ class ProjectLoader:
 
             data = json.load(file)
 
-        #
+        # ---------------------------------------------------------
         # Rimuove informazioni non appartenenti al modello
-        #
+        # ---------------------------------------------------------
 
         data.pop("format_version", None)
 
-        #
-        # Ricostruisce gli oggetti Photo
-        #
+        # ---------------------------------------------------------
+        # Ricostruisce gli Asset
+        # ---------------------------------------------------------
 
-        photos = [
-            Photo.from_dict(photo_data)
-            for photo_data in data.get("photos", [])
+        assets = [
+            Asset.from_dict(asset_data)
+            for asset_data in data.get("assets", [])
         ]
 
-        data["photos"] = photos
+        data["assets"] = assets
 
-        #
+        # ---------------------------------------------------------
         # Crea il progetto
-        #
+        # ---------------------------------------------------------
 
-        project = Project(**data)
-
-        return project
+        return Project(**data)
