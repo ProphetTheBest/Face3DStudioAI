@@ -250,18 +250,14 @@ class MainWindow(QMainWindow):
         if not file_list:
             return
 
-        photo_controller = (
-            self.app_controller.get_photo_controller()
-        )
-
         try:
 
-            photo_controller.import_photos(file_list)
+            project_controller.import_images(file_list)
 
             self.central_widget.project_panel.refresh()
 
             self.status_bar.showMessage(
-                f"{len(file_list)} photo(s) imported.",
+                f"{len(file_list)} image(s) imported.",
                 3000
             )
 

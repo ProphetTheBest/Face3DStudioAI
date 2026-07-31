@@ -8,13 +8,14 @@ Autore:
 Marco Cantù
 
 Versione:
-0.3.1
+1.0.0
 ==========================================================
 """
 
 import os
 
 from source.controllers.project_controller import ProjectController
+from source.models.assets.image_asset import ImageAsset
 from source.widgets.base_panel import BasePanel
 from source.widgets.project_tree_widget import ProjectTreeWidget
 
@@ -50,28 +51,31 @@ class ProjectPanel(BasePanel):
         )
 
         self.tree.update_counts(
-            photos=self.controller.get_photo_count(),
-            videos=self.controller.get_video_count(),
-            frames=self.controller.get_frame_count(),
-            landmarks=self.controller.get_landmark_count(),
-            meshes=self.controller.get_mesh_count(),
-            exports=self.controller.get_export_count(),
+            photos=self.controller.get_asset_count(),
+            videos=0,
+            frames=0,
+            landmarks=0,
+            meshes=0,
+            exports=0,
         )
 
         photos = []
 
         project_folder = self.controller.get_project_folder()
 
-        for photo in self.controller.get_photos():
+        for asset in self.controller.get_assets():
+
+            if not isinstance(asset, ImageAsset):
+                continue
 
             full_path = os.path.join(
                 project_folder,
-                photo.relative_path
+                str(asset.relative_path)
             )
 
             photos.append(
                 (
-                    photo.filename,
+                    asset.filename,
                     full_path,
                 )
             )

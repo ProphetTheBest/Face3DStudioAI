@@ -8,21 +8,19 @@ Autore:
 Marco Cantù
 
 Versione:
-0.5.0
+1.1.0
 ==========================================================
 """
 
+from source.models.assets.asset import Asset
 from source.models.project import Project
+from source.services.asset.image_importer import ImageImporter
 from source.services.project.project_manager import ProjectManager
 
 
 class ProjectController:
     """
     Controller del progetto.
-
-    Coordina la logica relativa al progetto e rappresenta
-    il punto di accesso della GUI per tutte le operazioni
-    sul progetto.
     """
 
     def __init__(
@@ -31,6 +29,7 @@ class ProjectController:
     ) -> None:
 
         self._project_manager = project_manager
+        self._image_importer = ImageImporter()
 
     # ---------------------------------------------------------
     # Gestione progetto
@@ -41,9 +40,6 @@ class ProjectController:
         project_name: str,
         project_folder: str,
     ) -> None:
-        """
-        Crea un nuovo progetto.
-        """
 
         self._project_manager.create_project(
             project_name,
@@ -56,108 +52,79 @@ class ProjectController:
         self,
         project_folder: str,
     ) -> None:
-        """
-        Apre un progetto esistente.
-        """
 
         self._project_manager.open_project(project_folder)
 
     # ---------------------------------------------------------
 
     def get_project(self) -> Project | None:
-        """
-        Restituisce il progetto corrente.
-        """
 
         return self._project_manager.current_project
 
     # ---------------------------------------------------------
 
     def get_project_name(self) -> str:
-        """
-        Restituisce il nome del progetto corrente.
-        """
 
         project = self.get_project()
 
-        if project is None:
-            return "Untitled"
+        return project.name if project else "Untitled"
 
-        return project.name
-    
+    # ---------------------------------------------------------
 
     def get_project_folder(self) -> str:
-        """
-        Restituisce la cartella del progetto.
-        """
+
+        project = self.get_project()
+
+        return project.project_folder if project else ""
+
+    # =========================================================
+    # Asset
+    # =========================================================
+
+    def get_assets(self) -> list[Asset]:
+
+        project = self.get_project()
+
+        return project.assets if project else []
+
+    # ---------------------------------------------------------
+
+    def add_asset(self, asset: Asset) -> None:
+
+        self._project_manager.add_asset(asset)
+
+    # ---------------------------------------------------------
+
+    def remove_asset(self, asset: Asset) -> None:
+
+        self._project_manager.remove_asset(asset)
+
+    # ---------------------------------------------------------
+
+    def import_images(self, file_list: list[str]) -> None:
 
         project = self.get_project()
 
         if project is None:
-            return ""
+            raise RuntimeError("Nessun progetto aperto.")
 
-        return project.project_folder
-    # ---------------------------------------------------------
-    # Foto
-    # ---------------------------------------------------------
+        for filename in file_list:
 
-    def get_photos(self):
-        """
-        Restituisce la lista delle fotografie del progetto.
-        """
+            asset = self._image_importer.import_image(
+                filename,
+                project.project_folder,
+            )
 
-        project = self.get_project()
+            self._project_manager.add_asset(asset)
 
-        if project is None:
-            return []
+        self._project_manager.save_project(
+            project.project_folder
+        )
 
-        return project.photos
-    # ---------------------------------------------------------
+    # =========================================================
     # Conteggi
-    # ---------------------------------------------------------
+    # =========================================================
 
-    def get_photo_count(self) -> int:
+    def get_asset_count(self) -> int:
 
-        project = self.get_project()
-
-        return len(project.photos) if project else 0
-
-    # ---------------------------------------------------------
-
-    def get_video_count(self) -> int:
-
-        project = self.get_project()
-
-        return len(project.videos) if project else 0
-
-    # ---------------------------------------------------------
-
-    def get_frame_count(self) -> int:
-
-        project = self.get_project()
-
-        return len(project.frames) if project else 0
-
-    # ---------------------------------------------------------
-
-    def get_landmark_count(self) -> int:
-
-        project = self.get_project()
-
-        return len(project.landmarks) if project else 0
-
-    # ---------------------------------------------------------
-
-    def get_mesh_count(self) -> int:
-
-        project = self.get_project()
-
-        return len(project.meshes) if project else 0
-
-    # ---------------------------------------------------------
-
-    def get_export_count(self) -> int:
-
-        project = self.get_project()
-
-        return len(project.exports) if project else 0
+        return self._project_manager.asset_count()

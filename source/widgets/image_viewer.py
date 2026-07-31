@@ -33,9 +33,13 @@ class ImageViewer(QGraphicsView):
         self.setScene(self._scene)
 
         self._current_image = None
+
         self._current_zoom = 1.0
 
+        self._fit_mode = True
+
         self._panning = False
+
         self._last_mouse_pos = None
 
         self.setAlignment(Qt.AlignCenter)
@@ -63,6 +67,8 @@ class ImageViewer(QGraphicsView):
         self.resetTransform()
 
         self._current_zoom = 1.0
+
+        self._fit_mode = True
 
     # ---------------------------------------------------------
 
@@ -93,12 +99,26 @@ class ImageViewer(QGraphicsView):
 
         self._current_zoom = 1.0
 
+        self._fit_mode = True
+
     # ---------------------------------------------------------
 
     def current_image(self):
 
         return self._current_image
 
+    # ---------------------------------------------------------
+
+    def _is_pan_button(self, event) -> bool:
+        """
+        Restituisce True se l'evento deve attivare il pan.
+
+        In futuro questo metodo potrà essere esteso per supportare:
+        - Barra spaziatrice + tasto sinistro
+        - Mouse configurabile
+        - Tavoletta grafica
+        """
+        return event.button() == Qt.MiddleButton
     # ---------------------------------------------------------
 
     def wheelEvent(self, event):
@@ -118,6 +138,8 @@ class ImageViewer(QGraphicsView):
 
         if new_zoom > self.MAX_ZOOM:
             return
+        
+        self._fit_mode = False
 
         self.scale(factor, factor)
 
@@ -127,7 +149,7 @@ class ImageViewer(QGraphicsView):
 
     def mousePressEvent(self, event):
 
-        if event.button() == Qt.MiddleButton:
+        if self._is_pan_button(event):
 
             self._panning = True
 
@@ -169,7 +191,7 @@ class ImageViewer(QGraphicsView):
 
     def mouseReleaseEvent(self, event):
 
-        if event.button() == Qt.MiddleButton:
+        if self._is_pan_button(event):
 
             self._panning = False
 
@@ -195,6 +217,6 @@ class ImageViewer(QGraphicsView):
 
         super().resizeEvent(event)
 
-        if self._current_zoom == 1.0:
+        if self._fit_mode:
 
             self.fit_image()

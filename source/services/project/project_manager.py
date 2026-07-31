@@ -12,7 +12,7 @@ Autore:
 Marco Cantù
 
 Versione:
-1.0.0
+1.1.0
 ==========================================================
 """
 
@@ -21,6 +21,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional
 
+from source.models.assets.asset import Asset
 from source.models.project import Project
 from source.services.project.project_loader import ProjectLoader
 from source.services.project.project_saver import ProjectSaver
@@ -60,24 +61,10 @@ class ProjectManager:
     ) -> Project:
         """
         Crea e salva un nuovo progetto.
-
-        Parameters
-        ----------
-        name : str
-            Nome del progetto.
-
-        project_folder : str
-            Cartella in cui salvare il progetto.
-
-        Returns
-        -------
-        Project
-            Progetto creato.
         """
 
         project = self.new_project(name)
 
-        # Costruisce la cartella finale del progetto
         final_folder = Path(project_folder) / name
 
         self.save_project(str(final_folder))
@@ -90,9 +77,6 @@ class ProjectManager:
         self,
         name: str = "Untitled",
     ) -> Project:
-        """
-        Crea un nuovo progetto in memoria.
-        """
 
         project = Project(name=name)
 
@@ -106,9 +90,6 @@ class ProjectManager:
         self,
         project_folder: str,
     ) -> None:
-        """
-        Salva il progetto corrente.
-        """
 
         if self._current_project is None:
             raise RuntimeError("Nessun progetto aperto.")
@@ -128,9 +109,6 @@ class ProjectManager:
         self,
         project_folder: str,
     ) -> Project:
-        """
-        Apre un progetto esistente.
-        """
 
         folder = Path(project_folder)
 
@@ -145,9 +123,6 @@ class ProjectManager:
     # -----------------------------------------------------
 
     def close_project(self) -> None:
-        """
-        Chiude il progetto corrente.
-        """
 
         self._current_project = None
 
@@ -157,8 +132,34 @@ class ProjectManager:
         self,
         project: Project,
     ) -> None:
-        """
-        Imposta il progetto corrente.
-        """
 
         self._current_project = project
+
+    # =====================================================
+    # Asset
+    # =====================================================
+
+    def add_asset(self, asset: Asset) -> None:
+
+        if self._current_project is None:
+            raise RuntimeError("Nessun progetto aperto.")
+
+        self._current_project.add_asset(asset)
+
+    # -----------------------------------------------------
+
+    def remove_asset(self, asset: Asset) -> None:
+
+        if self._current_project is None:
+            raise RuntimeError("Nessun progetto aperto.")
+
+        self._current_project.remove_asset(asset)
+
+    # -----------------------------------------------------
+
+    def asset_count(self) -> int:
+
+        if self._current_project is None:
+            return 0
+
+        return self._current_project.asset_count()

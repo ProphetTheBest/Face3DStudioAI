@@ -8,7 +8,7 @@ Autore:
 Marco Cantù
 
 Versione:
-0.3.0
+1.0.0
 ==========================================================
 """
 
@@ -16,7 +16,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 import uuid
 
-from source.models.photo import Photo
+from source.models.assets.asset import Asset
 
 
 @dataclass
@@ -46,29 +46,45 @@ class Project:
     )
 
     # ---------------------------------------------------------
-    # Risorse importate
+    # Asset del progetto
     # ---------------------------------------------------------
 
-    photos: list[Photo] = field(default_factory=list)
-
-    videos: list = field(default_factory=list)
-
-    frames: list = field(default_factory=list)
-
-    landmarks: list = field(default_factory=list)
-
-    meshes: list = field(default_factory=list)
-
-    textures: list = field(default_factory=list)
-
-    exports: list = field(default_factory=list)
+    assets: list[Asset] = field(default_factory=list)
 
     # ---------------------------------------------------------
-    # Gestione fotografie
+    # Gestione Asset
     # ---------------------------------------------------------
 
-    def add_photo(self, photo: Photo) -> None:
+    def add_asset(self, asset: Asset) -> None:
         """
-        Aggiunge una fotografia al progetto.
+        Aggiunge un asset al progetto.
         """
-        self.photos.append(photo)
+        self.assets.append(asset)
+        self.touch()
+
+    def remove_asset(self, asset: Asset) -> None:
+        """
+        Rimuove un asset dal progetto.
+        """
+        if asset in self.assets:
+            self.assets.remove(asset)
+            self.touch()
+
+    def clear_assets(self) -> None:
+        """
+        Elimina tutti gli asset del progetto.
+        """
+        self.assets.clear()
+        self.touch()
+
+    def asset_count(self) -> int:
+        """
+        Restituisce il numero di asset del progetto.
+        """
+        return len(self.assets)
+
+    def touch(self) -> None:
+        """
+        Aggiorna la data di ultima modifica del progetto.
+        """
+        self.modified = datetime.now().isoformat(timespec="seconds")

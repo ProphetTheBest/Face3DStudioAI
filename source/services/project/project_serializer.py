@@ -10,7 +10,7 @@ Autore:
 Marco Cantù
 
 Versione:
-0.2.0
+1.0.0
 ==========================================================
 """
 
@@ -22,97 +22,37 @@ class ProjectSerializer:
     Serializza un progetto.
     """
 
-    # ---------------------------------------------------------
-    # API pubblica
-    # ---------------------------------------------------------
-
     @staticmethod
     def to_dict(project: Project) -> dict:
-        """
-        Converte un Project in un dizionario.
-        """
 
         return {
-
-            #
-            # Informazioni generali
-            #
-
             "project_id": project.project_id,
             "name": project.name,
             "project_folder": project.project_folder,
             "created": project.created,
             "modified": project.modified,
-
-            #
-            # Risorse
-            #
-
-            "photos": ProjectSerializer._serialize_photos(project),
-
-            "videos": ProjectSerializer._serialize_videos(project),
-
-            "frames": ProjectSerializer._serialize_frames(project),
-
-            "landmarks": ProjectSerializer._serialize_landmarks(project),
-
-            "meshes": ProjectSerializer._serialize_meshes(project),
-
-            "textures": ProjectSerializer._serialize_textures(project),
-
-            "exports": ProjectSerializer._serialize_exports(project),
+            "assets": ProjectSerializer._serialize_assets(project),
         }
 
     # ---------------------------------------------------------
-    # Serializzazione risorse
-    # ---------------------------------------------------------
 
     @staticmethod
-    def _serialize_photos(project: Project) -> list:
+    def _serialize_assets(project: Project) -> list:
 
-        return [
-            photo.to_dict()
-            for photo in project.photos
-        ]
+        assets = []
 
-    # ---------------------------------------------------------
+        for asset in project.assets:
 
-    @staticmethod
-    def _serialize_videos(project: Project) -> list:
+            assets.append(
+                {
+                    "id": asset.id,
+                    "name": asset.name,
+                    "type": str(asset.asset_type),
+                    "relative_path": str(asset.relative_path),
+                    "created_at": asset.created_at.isoformat(),
+                    "notes": asset.notes,
+                    "metadata": asset.metadata,
+                }
+            )
 
-        return []
-
-    # ---------------------------------------------------------
-
-    @staticmethod
-    def _serialize_frames(project: Project) -> list:
-
-        return []
-
-    # ---------------------------------------------------------
-
-    @staticmethod
-    def _serialize_landmarks(project: Project) -> list:
-
-        return []
-
-    # ---------------------------------------------------------
-
-    @staticmethod
-    def _serialize_meshes(project: Project) -> list:
-
-        return []
-
-    # ---------------------------------------------------------
-
-    @staticmethod
-    def _serialize_textures(project: Project) -> list:
-
-        return []
-
-    # ---------------------------------------------------------
-
-    @staticmethod
-    def _serialize_exports(project: Project) -> list:
-
-        return []
+        return assets
