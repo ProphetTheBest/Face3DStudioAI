@@ -2,19 +2,24 @@
 ==========================================================
 Face3D Studio AI
 
-New Project Dialog
+File:
+new_project_dialog.py
+
+Descrizione:
+Dialog per la creazione di un nuovo progetto.
 
 Autore:
 Marco Cantù
 
 Versione:
-0.1.0
+1.0.0
 ==========================================================
 """
 
 from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
+    QFileDialog,
     QFormLayout,
     QHBoxLayout,
     QLineEdit,
@@ -33,61 +38,145 @@ class NewProjectDialog(QDialog):
         super().__init__(parent)
 
         self.setWindowTitle("New Project")
-        self.resize(550, 180)
+        self.resize(600, 180)
 
-        #
+        self._project_folder = ""
+
+        # -------------------------------------------------
         # Widgets
-        #
+        # -------------------------------------------------
 
         self.project_name_edit = QLineEdit()
 
         self.location_edit = QLineEdit()
-
         self.location_edit.setReadOnly(True)
 
         self.browse_button = QPushButton("Browse...")
 
-        #
-        # Layout posizione
-        #
+        # -------------------------------------------------
+        # Layout Location
+        # -------------------------------------------------
 
         location_layout = QHBoxLayout()
 
         location_layout.addWidget(self.location_edit)
-
         location_layout.addWidget(self.browse_button)
 
-        #
+        # -------------------------------------------------
         # Form
-        #
+        # -------------------------------------------------
 
-        form = QFormLayout()
+        form_layout = QFormLayout()
 
-        form.addRow("Project name:", self.project_name_edit)
+        form_layout.addRow(
+            "Project name:",
+            self.project_name_edit
+        )
 
-        form.addRow("Location:", location_layout)
+        form_layout.addRow(
+            "Location:",
+            location_layout
+        )
 
-        #
-        # Bottoni
-        #
+        # -------------------------------------------------
+        # Buttons
+        # -------------------------------------------------
 
-        buttons = QDialogButtonBox(
+        self.button_box = QDialogButtonBox(
             QDialogButtonBox.Ok |
             QDialogButtonBox.Cancel
         )
 
-        buttons.accepted.connect(self.accept)
+        self.ok_button = self.button_box.button(
+            QDialogButtonBox.Ok
+        )
+        
+        self.ok_button.setText("Create")
+        self.ok_button.setEnabled(False)
 
-        buttons.rejected.connect(self.reject)
-
-        #
-        # Layout principale
-        #
+        # -------------------------------------------------
+        # Main Layout
+        # -------------------------------------------------
 
         layout = QVBoxLayout(self)
 
-        layout.addLayout(form)
-
+        layout.addLayout(form_layout)
         layout.addStretch()
+        layout.addWidget(self.button_box)
 
-        layout.addWidget(buttons)
+        # -------------------------------------------------
+        # Signals
+        # -------------------------------------------------
+
+        self.browse_button.clicked.connect(
+            self._on_browse
+        )
+
+        self.project_name_edit.textChanged.connect(
+            self._update_ok_button
+        )
+
+        self.button_box.accepted.connect(
+            self.accept
+        )
+
+        self.button_box.rejected.connect(
+            self.reject
+        )
+
+    # =====================================================
+    # Slots
+    # =====================================================
+
+    def _on_browse(self):
+        """
+        Seleziona la cartella del progetto.
+        """
+
+        folder = QFileDialog.getExistingDirectory(
+            self,
+            "Select Project Folder"
+        )
+
+        if not folder:
+            return
+
+        self._project_folder = folder
+
+        self.location_edit.setText(folder)
+
+        self._update_ok_button()
+
+    # =====================================================
+
+    def _update_ok_button(self):
+        """
+        Abilita il pulsante Create solo quando il dialog è valido.
+        """
+        enabled = (
+            self.project_name_edit.text().strip() != ""
+            and
+            self._project_folder != ""
+        )
+
+        self.ok_button.setEnabled(enabled)
+
+    # =====================================================
+    # Public API
+    # =====================================================
+
+    def project_name(self) -> str:
+        """
+        Restituisce il nome del progetto.
+        """
+
+        return self.project_name_edit.text().strip()
+
+    # -----------------------------------------------------
+
+    def project_folder(self) -> str:
+        """
+        Restituisce la cartella scelta.
+        """
+
+        return self._project_folder

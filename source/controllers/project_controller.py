@@ -45,8 +45,10 @@ class ProjectController:
         Crea un nuovo progetto.
         """
 
-        self._project_manager.new_project(project_name)
-        self._project_manager.save_project(project_folder)
+        self._project_manager.create_project(
+            project_name,
+            project_folder,
+        )
 
     # ---------------------------------------------------------
 
@@ -82,7 +84,34 @@ class ProjectController:
             return "Untitled"
 
         return project.name
+    
 
+    def get_project_folder(self) -> str:
+        """
+        Restituisce la cartella del progetto.
+        """
+
+        project = self.get_project()
+
+        if project is None:
+            return ""
+
+        return project.project_folder
+    # ---------------------------------------------------------
+    # Foto
+    # ---------------------------------------------------------
+
+    def get_photos(self):
+        """
+        Restituisce la lista delle fotografie del progetto.
+        """
+
+        project = self.get_project()
+
+        if project is None:
+            return []
+
+        return project.photos
     # ---------------------------------------------------------
     # Conteggi
     # ---------------------------------------------------------

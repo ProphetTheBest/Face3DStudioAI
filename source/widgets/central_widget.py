@@ -60,7 +60,10 @@ class CentralWidget(QWidget):
         self.properties_panel = PropertiesPanel()
 
         self.log_panel = LogPanel()
-
+        
+        self.project_panel.tree.photo_selected.connect(
+            self.viewer_panel.show_photo
+        )
     # ---------------------------------------------------------
 
     def _create_layout(self) -> None:

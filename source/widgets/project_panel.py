@@ -8,9 +8,11 @@ Autore:
 Marco Cantù
 
 Versione:
-0.3.0
+0.3.1
 ==========================================================
 """
+
+import os
 
 from source.controllers.project_controller import ProjectController
 from source.widgets.base_panel import BasePanel
@@ -34,7 +36,7 @@ class ProjectPanel(BasePanel):
 
         self.add_content_widget(self.tree)
 
-        self.refresh
+        self.refresh()
 
     # ---------------------------------------------------------
 
@@ -55,3 +57,23 @@ class ProjectPanel(BasePanel):
             meshes=self.controller.get_mesh_count(),
             exports=self.controller.get_export_count(),
         )
+
+        photos = []
+
+        project_folder = self.controller.get_project_folder()
+
+        for photo in self.controller.get_photos():
+
+            full_path = os.path.join(
+                project_folder,
+                photo.relative_path
+            )
+
+            photos.append(
+                (
+                    photo.filename,
+                    full_path,
+                )
+            )
+
+        self.tree.set_photos(photos)
