@@ -12,7 +12,7 @@ Autore:
 Marco Cantù
 
 Versione:
-0.3.1
+0.3.2
 ==========================================================
 """
 
@@ -36,6 +36,7 @@ class CentralWidget(QWidget):
     """
 
     def __init__(self, app_controller: ApplicationController) -> None:
+
         super().__init__()
 
         self.app_controller = app_controller
@@ -51,19 +52,31 @@ class CentralWidget(QWidget):
         Crea tutti i pannelli dell'interfaccia.
         """
 
-        self.project_panel = ProjectPanel(
+        project_controller = (
             self.app_controller.get_project_controller()
         )
 
-        self.viewer_panel = ViewerPanel()
+        self.project_panel = ProjectPanel(
+            project_controller
+        )
+
+        self.viewer_panel = ViewerPanel(
+            project_controller
+        )
 
         self.properties_panel = PropertiesPanel()
 
         self.log_panel = LogPanel()
-        
-        self.project_panel.tree.photo_selected.connect(
-            self.viewer_panel.show_photo
+
+        #
+        # Il Viewer viene aggiornato SOLO dopo che
+        # il ProjectPanel ha aggiornato il current_asset.
+        #
+
+        self.project_panel.asset_selected.connect(
+            self.viewer_panel.show_current_asset
         )
+
     # ---------------------------------------------------------
 
     def _create_layout(self) -> None:
@@ -71,26 +84,33 @@ class CentralWidget(QWidget):
         Costruisce il layout principale.
         """
 
-        #
-        # Colonna destra
-        #
-
         right_layout = QVBoxLayout()
 
-        right_layout.addWidget(self.viewer_panel, 8)
+        right_layout.addWidget(
+            self.viewer_panel,
+            8,
+        )
 
-        right_layout.addWidget(self.log_panel, 2)
-
-        #
-        # Layout principale
-        #
+        right_layout.addWidget(
+            self.log_panel,
+            2,
+        )
 
         main_layout = QHBoxLayout()
 
-        main_layout.addWidget(self.project_panel, 2)
+        main_layout.addWidget(
+            self.project_panel,
+            2,
+        )
 
-        main_layout.addLayout(right_layout, 6)
+        main_layout.addLayout(
+            right_layout,
+            6,
+        )
 
-        main_layout.addWidget(self.properties_panel, 2)
+        main_layout.addWidget(
+            self.properties_panel,
+            2,
+        )
 
         self.setLayout(main_layout)

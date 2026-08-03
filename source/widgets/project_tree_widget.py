@@ -10,25 +10,25 @@ Autore:
 Marco Cantù
 
 Versione:
-0.1.2
+1.0.0
 ==========================================================
 """
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QTreeWidget, QTreeWidgetItem
-from PySide6.QtCore import Qt, Signal
+
 
 class ProjectTreeWidget(QTreeWidget):
     """
     Albero del progetto.
     """
-    photo_selected = Signal(str)
 
     def __init__(self) -> None:
 
         super().__init__()
 
         self._create_tree()
-        self.itemClicked.connect(self._on_item_clicked)
+
     # ---------------------------------------------------------
 
     def _create_tree(self) -> None:
@@ -55,9 +55,6 @@ class ProjectTreeWidget(QTreeWidget):
     # ---------------------------------------------------------
 
     def _create_folder_item(self, text: str) -> QTreeWidgetItem:
-        """
-        Crea un nodo figlio del progetto.
-        """
 
         item = QTreeWidgetItem([f"{text} (0)"])
 
@@ -68,11 +65,11 @@ class ProjectTreeWidget(QTreeWidget):
     # ---------------------------------------------------------
 
     def set_project_name(self, name: str) -> None:
-        """
-        Aggiorna il nome del progetto.
-        """
 
-        self.project_item.setText(0, f"📁 {name}")
+        self.project_item.setText(
+            0,
+            f"📁 {name}"
+        )
 
     # ---------------------------------------------------------
 
@@ -85,9 +82,6 @@ class ProjectTreeWidget(QTreeWidget):
         meshes: int = 0,
         exports: int = 0,
     ) -> None:
-        """
-        Aggiorna i contatori delle cartelle.
-        """
 
         self.photos_item.setText(0, f"📷 Photos ({photos})")
         self.videos_item.setText(0, f"🎥 Videos ({videos})")
@@ -100,22 +94,24 @@ class ProjectTreeWidget(QTreeWidget):
 
     def set_photos(self, photos) -> None:
         """
-        Aggiorna il contenuto della cartella Photos.
-
         photos:
             [
-                ("IMG001.jpg", "C:/.../IMG001.jpg"),
+                (filename, asset_id),
                 ...
             ]
         """
 
         self.photos_item.takeChildren()
 
-        for filename, full_path in photos:
+        for filename, asset_id in photos:
 
             item = QTreeWidgetItem([filename])
 
-            item.setData(0, Qt.UserRole, full_path)
+            item.setData(
+                0,
+                Qt.UserRole,
+                asset_id
+            )
 
             self.photos_item.addChild(item)
 
@@ -126,24 +122,29 @@ class ProjectTreeWidget(QTreeWidget):
 
         self.photos_item.setExpanded(True)
 
-    def clear_project(self) -> None:
+    # ---------------------------------------------------------
+
+    def current_asset_id(self) -> str | None:
         """
-        Ripristina il contenuto dell'albero.
+        Restituisce l'id dell'asset selezionato.
         """
 
-        self.set_project_name("Untitled")
+        item = self.currentItem()
 
-        self.update_counts()
+        if item is None:
+            return None
+
+        return item.data(
+            0,
+            Qt.UserRole
+        )
 
     # ---------------------------------------------------------
 
-    def _on_item_clicked(self, item, column):
-        """
-        Gestisce il click su un elemento dell'albero.
-        """
+    def clear_project(self) -> None:
 
-        path = item.data(0, Qt.UserRole)
+        self.set_project_name("Untitled")
 
-        if path:
+        self.photos_item.takeChildren()
 
-            self.photo_selected.emit(path)
+        self.update_counts()

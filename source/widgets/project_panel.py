@@ -8,11 +8,13 @@ Autore:
 Marco Cantù
 
 Versione:
-1.0.0
+1.2.0
 ==========================================================
 """
 
 import os
+
+from PySide6.QtCore import Signal
 
 from source.controllers.project_controller import ProjectController
 from source.models.assets.image_asset import ImageAsset
@@ -27,6 +29,8 @@ class ProjectPanel(BasePanel):
     Visualizza il contenuto del progetto.
     """
 
+    asset_selected = Signal()
+
     def __init__(self, controller: ProjectController) -> None:
 
         super().__init__("PROJECT")
@@ -34,6 +38,10 @@ class ProjectPanel(BasePanel):
         self.controller = controller
 
         self.tree = ProjectTreeWidget()
+
+        self.tree.itemClicked.connect(
+            self._on_tree_item_clicked
+        )
 
         self.add_content_widget(self.tree)
 
@@ -68,16 +76,32 @@ class ProjectPanel(BasePanel):
             if not isinstance(asset, ImageAsset):
                 continue
 
-            full_path = os.path.join(
-                project_folder,
-                str(asset.relative_path)
-            )
-
             photos.append(
                 (
                     asset.filename,
-                    full_path,
+                    asset.id,
                 )
             )
 
         self.tree.set_photos(photos)
+
+    # ---------------------------------------------------------
+
+    def _on_tree_item_clicked(self, item, column) -> None:
+        """
+        Gestisce la selezione di un asset.
+        """
+
+        asset_id = self.tree.current_asset_id()
+
+        if asset_id is None:
+            return
+
+        asset = self.controller.get_asset_by_id(asset_id)
+
+        if asset is None:
+            return
+
+        self.controller.set_current_asset(asset)
+
+        self.asset_selected.emit()

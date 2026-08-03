@@ -8,11 +8,11 @@ Autore:
 Marco Cantù
 
 Versione:
-0.1.0
+0.2.0
 ==========================================================
 """
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QRectF
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
     QGraphicsPixmapItem,
@@ -24,16 +24,6 @@ class ImageScene(QGraphicsScene):
     """
     Scena grafica contenente tutti gli elementi
     visualizzati nel Viewer.
-
-    Attualmente gestisce solamente l'immagine.
-    In futuro conterrà anche:
-
-    - Landmarks
-    - Mesh
-    - Texture
-    - Overlay
-    - Misure
-    - Annotazioni
     """
 
     def __init__(self, parent=None):
@@ -50,6 +40,8 @@ class ImageScene(QGraphicsScene):
 
         self._pixmap_item.setPixmap(QPixmap())
 
+        self.setSceneRect(QRectF())
+
     # ---------------------------------------------------------
 
     def set_image(self, filename: str) -> bool:
@@ -63,6 +55,14 @@ class ImageScene(QGraphicsScene):
             return False
 
         self._pixmap_item.setPixmap(pixmap)
+
+        #
+        # Aggiorna SEMPRE il rettangolo della scena.
+        #
+
+        self.setSceneRect(
+            self._pixmap_item.boundingRect()
+        )
 
         return True
 

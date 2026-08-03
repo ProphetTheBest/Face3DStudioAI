@@ -66,17 +66,28 @@ class ImageViewer(QGraphicsView):
 
         self.resetTransform()
 
+        self.centerOn(0, 0)
+
+        self.horizontalScrollBar().setValue(0)
+        self.verticalScrollBar().setValue(0)
+
         self._current_zoom = 1.0
 
         self._fit_mode = True
+
+        self.viewport().update()
 
     # ---------------------------------------------------------
 
     def show_image(self, filename: str):
 
-        if not self._scene.set_image(filename):
+        #
+        # Riparte sempre da una vista pulita.
+        #
 
-            self.clear()
+        self.clear()
+
+        if not self._scene.set_image(filename):
 
             return
 
@@ -97,6 +108,10 @@ class ImageViewer(QGraphicsView):
             Qt.KeepAspectRatio
         )
 
+        self.centerOn(
+            self._scene.pixmap_item()
+        )
+        
         self._current_zoom = 1.0
 
         self._fit_mode = True
