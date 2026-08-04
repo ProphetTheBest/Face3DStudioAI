@@ -8,11 +8,9 @@ Autore:
 Marco Cantù
 
 Versione:
-0.2.1
+0.3.0
 ==========================================================
 """
-
-from pathlib import Path
 
 from PySide6.QtWidgets import (
     QFormLayout,
@@ -47,6 +45,7 @@ class PropertiesPanel(BasePanel):
         self.lbl_type = QLabel("-")
         self.lbl_format = QLabel("-")
         self.lbl_resolution = QLabel("-")
+        self.lbl_channels = QLabel("-")
         self.lbl_size = QLabel("-")
         self.lbl_path = QLabel("-")
 
@@ -56,6 +55,7 @@ class PropertiesPanel(BasePanel):
         layout.addRow("Type", self.lbl_type)
         layout.addRow("Format", self.lbl_format)
         layout.addRow("Resolution", self.lbl_resolution)
+        layout.addRow("Channels", self.lbl_channels)
         layout.addRow("File size", self.lbl_size)
         layout.addRow("Relative path", self.lbl_path)
 
@@ -69,6 +69,7 @@ class PropertiesPanel(BasePanel):
         self.lbl_type.setText("-")
         self.lbl_format.setText("-")
         self.lbl_resolution.setText("-")
+        self.lbl_channels.setText("-")
         self.lbl_size.setText("-")
         self.lbl_path.setText("-")
 
@@ -112,9 +113,33 @@ class PropertiesPanel(BasePanel):
         )
 
         #
-        # Saranno compilati nella prossima milestone
+        # Metadati immagine
         #
 
-        self.lbl_resolution.setText("-")
+        if hasattr(asset, "width"):
 
-        self.lbl_size.setText("-")
+            if asset.width > 0 and asset.height > 0:
+
+                self.lbl_resolution.setText(
+                    f"{asset.width} × {asset.height}"
+                )
+
+            self.lbl_channels.setText(
+                str(asset.channels)
+            )
+
+            size = asset.file_size
+
+            if size < 1024:
+
+                text = f"{size} B"
+
+            elif size < 1024 * 1024:
+
+                text = f"{size / 1024:.1f} KB"
+
+            else:
+
+                text = f"{size / (1024 * 1024):.2f} MB"
+
+            self.lbl_size.setText(text)

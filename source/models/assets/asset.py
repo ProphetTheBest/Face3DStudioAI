@@ -102,7 +102,15 @@ class Asset:
             "metadata": data.get("metadata", {}),
         }
 
-        if asset_type == AssetType.IMAGE:
-            return ImageAsset(**common_args)
 
+        if asset_type == AssetType.IMAGE:
+
+            return ImageAsset(
+                **common_args,
+                width=data.get("width", 0),
+                height=data.get("height", 0),
+                channels=data.get("channels", 0),
+                file_size=data.get("file_size", 0),
+            )
+        
         raise ValueError(f"Unsupported asset type: {asset_type}")

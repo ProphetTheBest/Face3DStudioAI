@@ -10,11 +10,12 @@ Autore:
 Marco Cantù
 
 Versione:
-1.0.0
+1.1.0
 ==========================================================
 """
 
 from source.models.project import Project
+from source.models.assets.image_asset import ImageAsset
 
 
 class ProjectSerializer:
@@ -43,16 +44,29 @@ class ProjectSerializer:
 
         for asset in project.assets:
 
-            assets.append(
-                {
-                    "id": asset.id,
-                    "name": asset.name,
-                    "type": str(asset.asset_type),
-                    "relative_path": str(asset.relative_path),
-                    "created_at": asset.created_at.isoformat(),
-                    "notes": asset.notes,
-                    "metadata": asset.metadata,
-                }
-            )
+            data = {
+                "id": asset.id,
+                "name": asset.name,
+                "type": str(asset.asset_type),
+                "relative_path": str(asset.relative_path),
+                "created_at": asset.created_at.isoformat(),
+                "notes": asset.notes,
+                "metadata": asset.metadata,
+            }
+
+            #
+            # Campi specifici delle immagini
+            #
+
+            if isinstance(asset, ImageAsset):
+
+                data.update({
+                    "width": asset.width,
+                    "height": asset.height,
+                    "channels": asset.channels,
+                    "file_size": asset.file_size,
+                })
+
+            assets.append(data)
 
         return assets
