@@ -8,7 +8,7 @@ Autore:
 Marco Cantù
 
 Versione:
-1.0.0
+1.1.0
 ==========================================================
 """
 
@@ -28,5 +28,9 @@ class ImageAsset(Asset):
     height: int = 0
     channels: int = 0
 
+    # byte
+    file_size: int = 0
+
     def __post_init__(self):
+
         self.asset_type = AssetType.IMAGE

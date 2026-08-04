@@ -12,7 +12,7 @@ Autore:
 Marco Cantù
 
 Versione:
-0.3.2
+0.3.3
 ==========================================================
 """
 
@@ -69,13 +69,27 @@ class CentralWidget(QWidget):
         self.log_panel = LogPanel()
 
         #
-        # Il Viewer viene aggiornato SOLO dopo che
-        # il ProjectPanel ha aggiornato il current_asset.
+        # Aggiorna Viewer e Properties quando cambia
+        # l'asset selezionato.
         #
 
         self.project_panel.asset_selected.connect(
-            self.viewer_panel.show_current_asset
+            self._asset_selection_changed
         )
+
+    # ---------------------------------------------------------
+
+    def _asset_selection_changed(self):
+
+        project_controller = (
+            self.app_controller.get_project_controller()
+        )
+
+        asset = project_controller.get_current_asset()
+
+        self.viewer_panel.show_current_asset()
+
+        self.properties_panel.show_asset(asset)
 
     # ---------------------------------------------------------
 
