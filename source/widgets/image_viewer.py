@@ -18,6 +18,10 @@ from PySide6.QtWidgets import QGraphicsView
 
 from source.widgets.image_scene import ImageScene
 
+from source.ai.models.face_detection import FaceDetection
+
+from source.ai.models.face_landmark import FaceLandmark
+
 class ImageViewer(QGraphicsView):
 
     MIN_ZOOM = 0.10
@@ -61,6 +65,10 @@ class ImageViewer(QGraphicsView):
     def clear(self):
 
         self._scene.clear_image()
+
+        self._scene.clear_faces()
+
+        self._scene.clear_landmarks()
 
         self._current_image = None
 
@@ -121,7 +129,34 @@ class ImageViewer(QGraphicsView):
     def current_image(self):
 
         return self._current_image
+    # ---------------------------------------------------------
 
+    def show_faces(
+        self,
+        faces: list[FaceDetection],
+    ) -> None:
+
+        self._scene.show_faces(faces)
+
+    # ---------------------------------------------------------
+
+    def show_landmarks(
+        self,
+        landmarks: list[FaceLandmark],
+    ) -> None:
+
+        self._scene.show_landmarks(landmarks)
+
+    # ---------------------------------------------------------
+
+    def clear_landmarks(self) -> None:
+
+        self._scene.clear_landmarks()
+    # ---------------------------------------------------------
+
+    def clear_faces(self) -> None:
+
+        self._scene.clear_faces()
     # ---------------------------------------------------------
 
     def _is_pan_button(self, event) -> bool:
