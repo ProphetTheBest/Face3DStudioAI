@@ -8,34 +8,35 @@ Autore:
 Marco Cantù
 
 Versione:
-1.0.0
+1.1.0
 ==========================================================
 """
 
 from dataclasses import dataclass, field
 
-from source.ai.models.face_landmark import FaceLandmark
+from source.models.geometry.vertex3d import Vertex3D
+from source.models.geometry.triangle import Triangle
 
 
-@dataclass
+@dataclass(slots=True)
 class FaceMesh:
     """
-    Modello geometrico della mesh facciale.
+    Mesh geometrica del volto.
 
-    Contiene la geometria del volto indipendentemente
-    dal motore AI utilizzato.
+    Questa classe è indipendente dal provider AI.
+    Contiene esclusivamente dati geometrici.
     """
 
     #
-    # Vertici
+    # Vertici 3D
     #
 
-    vertices: list[FaceLandmark] = field(
+    vertices: list[Vertex3D] = field(
         default_factory=list
     )
 
     #
-    # Connessioni MediaPipe
+    # Connessioni (wireframe)
     #
 
     edges: list[tuple[int, int]] = field(
@@ -46,6 +47,6 @@ class FaceMesh:
     # Triangoli
     #
 
-    triangles: list[tuple[int, int, int]] = field(
+    triangles: list[Triangle] = field(
         default_factory=list
     )

@@ -8,7 +8,7 @@ Autore:
 Marco Cantù
 
 Versione:
-1.1.0
+1.2.0
 ==========================================================
 """
 
@@ -32,11 +32,13 @@ from source.models.assets.image_asset import ImageAsset
 from source.models.face import Face
 from source.models.face_mesh import FaceMesh
 
+from source.models.geometry.vertex3d import Vertex3D
+
 
 class FaceAnalysisService:
     """
     Analizza un ImageAsset e costruisce
-    il modello dati del volto.
+    il modello geometrico del volto.
     """
 
     def __init__(self):
@@ -72,7 +74,7 @@ class FaceAnalysisService:
             )
 
             #
-            # Landmark
+            # Landmark originali (temporanei)
             #
 
             if index < len(mesh_faces):
@@ -82,14 +84,30 @@ class FaceAnalysisService:
                 face.landmarks = landmarks
 
                 #
-                # Costruzione Mesh
+                # Conversione in vertici del motore
+                #
+
+                vertices = [
+
+                    Vertex3D(
+                        x=lm.x,
+                        y=lm.y,
+                        z=lm.z,
+                    )
+
+                    for lm in landmarks
+
+                ]
+
+                #
+                # Mesh geometrica
                 #
 
                 face.mesh = FaceMesh(
 
-                    vertices=landmarks,
+                    vertices=vertices,
 
-                    edges=TESSELATION,
+                    edges=list(TESSELATION),
 
                 )
 
