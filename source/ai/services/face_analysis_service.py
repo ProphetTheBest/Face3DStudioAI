@@ -82,10 +82,9 @@ class FaceAnalysisService:
 
                     Vertex3D(
                         x=lm.x,
-                        y=lm.y,
+                        y=1.0 - lm.y,
                         z=lm.z,
                     )
-
                     for lm in landmarks
 
                 ]

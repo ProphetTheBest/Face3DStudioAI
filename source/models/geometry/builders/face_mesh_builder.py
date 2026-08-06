@@ -16,7 +16,7 @@ from source.ai.topology.face_mesh_topology import TESSELATION
 
 from source.models.face_mesh import FaceMesh
 from source.models.geometry.vertex3d import Vertex3D
-
+from source.models.geometry.geometry_normalizer import GeometryNormalizer
 
 class FaceMeshBuilder:
     """
@@ -36,8 +36,9 @@ class FaceMeshBuilder:
         mesh.edges = list(TESSELATION)
 
         #
-        # I triangoli verranno aggiunti
-        # nello sprint successivo.
+        # Centro e scala
         #
+
+        GeometryNormalizer.normalize(mesh)
 
         return mesh
