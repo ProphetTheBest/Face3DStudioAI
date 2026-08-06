@@ -8,16 +8,25 @@ Autore:
 Marco Cantù
 
 Versione:
-0.3.0
+0.5.0
 ==========================================================
 """
 
-from source.controllers.project_controller import ProjectController
+from source.ai.services.face_analysis_service import (
+    FaceAnalysisService,
+)
+
+from source.controllers.project_controller import (
+    ProjectController,
+)
+
+from source.models.assets.image_asset import (
+    ImageAsset,
+)
+
 from source.widgets.base_panel import BasePanel
 from source.widgets.image_viewer import ImageViewer
-from source.ai.providers.mediapipe_face_detector import MediaPipeFaceDetector
-from source.ai.services.detection_service import DetectionService
-from source.ai.providers.mediapipe_face_mesh import MediaPipeFaceMesh
+
 
 class ViewerPanel(BasePanel):
 
@@ -32,13 +41,11 @@ class ViewerPanel(BasePanel):
 
         self.viewer = ImageViewer()
 
-        self._detection_service = DetectionService(
-            MediaPipeFaceDetector()
+        self._analysis_service = FaceAnalysisService()
+
+        self.add_content_widget(
+            self.viewer
         )
-
-        self._face_mesh = MediaPipeFaceMesh()
-
-        self.add_content_widget(self.viewer)
 
     # ---------------------------------------------------------
 
@@ -52,43 +59,67 @@ class ViewerPanel(BasePanel):
 
             return
 
+        asset = self._controller.get_current_asset()
+
+        if not isinstance(asset, ImageAsset):
+
+            self.viewer.clear()
+
+            return
+
         #
-        # Visualizza l'immagine
+        # Visualizza immagine
         #
 
-        self.viewer.show_image(filename)
-
-        #
-        # Face Detection
-        #
-
-        faces = self._detection_service.detect(
+        self.viewer.show_image(
             filename
         )
 
         #
-        # Disegna i bounding box
+        # Analisi AI
         #
 
-        self.viewer.show_faces(faces)
+        self._analysis_service.analyze(
+            asset,
+            filename,
+        )
 
-        import os
+        #
+        # Bounding Box
+        #
 
-        print()
-        print("===================================")
-        print("Filename:", filename)
-        print("Esiste:", os.path.exists(filename))
-        print("===================================")
-        
-        mesh_faces = self._face_mesh.detect(filename)
+        self.viewer.show_faces(
 
-        print()
-        print("Numero volti mesh:", len(mesh_faces))
+            [
+                face.detection
 
-        if mesh_faces:
+                for face in asset.faces
+            ]
 
-            print("Landmark:", len(mesh_faces[0]))
+        )
+
+        #
+        # Mesh
+        #
+
+        if asset.faces:
+
+            face = asset.faces[0]
+
+            #
+            # Wireframe
+            #
+
+            if face.mesh is not None:
+
+                self.viewer.show_face_mesh(
+                    face.mesh
+                )
+
+            #
+            # Landmark (temporaneo)
+            #
 
             self.viewer.show_landmarks(
-                mesh_faces[0]
-            ) 
+                face.landmarks
+            )

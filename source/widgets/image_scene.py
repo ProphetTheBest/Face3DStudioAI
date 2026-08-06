@@ -8,22 +8,15 @@ Autore:
 Marco Cantù
 
 Versione:
-0.2.0
+0.3.0
 ==========================================================
 """
 
-from cmath import rect
-
-from PySide6.QtCore import Qt, QRectF
-
-from PySide6.QtGui import (
-    QColor,
-    QPen,
-    QPixmap,
-)
-
+from PySide6.QtCore import QRectF
+from PySide6.QtGui import QColor, QPen, QPixmap, QBrush
 from PySide6.QtWidgets import (
     QGraphicsEllipseItem,
+    QGraphicsLineItem,
     QGraphicsPixmapItem,
     QGraphicsRectItem,
     QGraphicsScene,
@@ -31,7 +24,8 @@ from PySide6.QtWidgets import (
 
 from source.ai.models.face_detection import FaceDetection
 from source.ai.models.face_landmark import FaceLandmark
-from PySide6.QtGui import QBrush
+from source.models.face_mesh import FaceMesh
+
 
 class ImageScene(QGraphicsScene):
     """
@@ -51,6 +45,8 @@ class ImageScene(QGraphicsScene):
 
         self._landmark_items: list[QGraphicsEllipseItem] = []
 
+        self._mesh_items: list[QGraphicsLineItem] = []
+
     # ---------------------------------------------------------
 
     def clear_image(self):
@@ -58,8 +54,10 @@ class ImageScene(QGraphicsScene):
         self._pixmap_item.setPixmap(QPixmap())
 
         self.clear_faces()
-        
+
         self.clear_landmarks()
+
+        self.clear_face_mesh()
 
         self.setSceneRect(QRectF())
 
@@ -76,10 +74,6 @@ class ImageScene(QGraphicsScene):
             return False
 
         self._pixmap_item.setPixmap(pixmap)
-
-        #
-        # Aggiorna SEMPRE il rettangolo della scena.
-        #
 
         self.setSceneRect(
             self._pixmap_item.boundingRect()
@@ -99,7 +93,6 @@ class ImageScene(QGraphicsScene):
 
         return self._pixmap_item
 
-    # ---------------------------------------------------------
     # ---------------------------------------------------------
 
     def clear_faces(self):
@@ -121,6 +114,14 @@ class ImageScene(QGraphicsScene):
         self._landmark_items.clear()
 
     # ---------------------------------------------------------
+
+    def clear_face_mesh(self):
+
+        for item in self._mesh_items:
+
+            self.removeItem(item)
+
+        self._mesh_items.clear()
 
     # ---------------------------------------------------------
 
@@ -147,21 +148,53 @@ class ImageScene(QGraphicsScene):
             y = point.y * height
 
             item = self.addEllipse(
-
                 x - radius,
                 y - radius,
                 radius * 2,
                 radius * 2,
-
                 pen,
                 brush,
-
             )
 
             item.setZValue(100)
 
-            self._landmark_items.append(item)            
+            self._landmark_items.append(item)
+
     # ---------------------------------------------------------
+
+    def show_face_mesh(
+        self,
+        mesh: FaceMesh,
+    ):
+
+        self.clear_face_mesh()
+
+        if mesh is None:
+
+            return
+
+        width = self._pixmap_item.pixmap().width()
+        height = self._pixmap_item.pixmap().height()
+
+        pen = QPen(QColor(0, 180, 255))
+        pen.setWidth(1)
+
+        for start, end in mesh.edges:
+
+            p1 = mesh.vertices[start]
+            p2 = mesh.vertices[end]
+
+            line = self.addLine(
+                p1.x * width,
+                p1.y * height,
+                p2.x * width,
+                p2.y * height,
+                pen,
+            )
+
+            line.setZValue(75)
+
+            self._mesh_items.append(line)
 
     # ---------------------------------------------------------
 
@@ -178,20 +211,19 @@ class ImageScene(QGraphicsScene):
         for face in faces:
 
             rect = self.addRect(
-
                 face.x,
                 face.y,
                 face.width,
                 face.height,
-
                 pen,
-
             )
 
             rect.setZValue(50)
 
             self._face_items.append(rect)
-            
+
+    # ---------------------------------------------------------
+
     def image_rect(self):
 
         return self._pixmap_item.boundingRect()

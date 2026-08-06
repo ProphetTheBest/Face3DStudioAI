@@ -8,7 +8,7 @@ Autore:
 Marco Cantù
 
 Versione:
-0.3.0
+0.4.0
 ==========================================================
 """
 
@@ -19,8 +19,10 @@ from PySide6.QtWidgets import QGraphicsView
 from source.widgets.image_scene import ImageScene
 
 from source.ai.models.face_detection import FaceDetection
-
 from source.ai.models.face_landmark import FaceLandmark
+
+from source.models.face_mesh import FaceMesh
+
 
 class ImageViewer(QGraphicsView):
 
@@ -58,17 +60,15 @@ class ImageViewer(QGraphicsView):
             QGraphicsView.AnchorViewCenter
         )
 
-        self.setDragMode(QGraphicsView.NoDrag)
+        self.setDragMode(
+            QGraphicsView.NoDrag
+        )
 
     # ---------------------------------------------------------
 
     def clear(self):
 
         self._scene.clear_image()
-
-        self._scene.clear_faces()
-
-        self._scene.clear_landmarks()
 
         self._current_image = None
 
@@ -77,6 +77,7 @@ class ImageViewer(QGraphicsView):
         self.centerOn(0, 0)
 
         self.horizontalScrollBar().setValue(0)
+
         self.verticalScrollBar().setValue(0)
 
         self._current_zoom = 1.0
@@ -87,11 +88,10 @@ class ImageViewer(QGraphicsView):
 
     # ---------------------------------------------------------
 
-    def show_image(self, filename: str):
-
-        #
-        # Riparte sempre da una vista pulita.
-        #
+    def show_image(
+        self,
+        filename: str,
+    ):
 
         self.clear()
 
@@ -102,24 +102,31 @@ class ImageViewer(QGraphicsView):
         self._current_image = filename
 
         self.fit_image()
+
     # ---------------------------------------------------------
 
     def fit_image(self):
 
         if not self._scene.has_image():
-           return
+
+            return
 
         self.resetTransform()
 
         self.fitInView(
+
             self._scene.pixmap_item(),
-            Qt.KeepAspectRatio
+
+            Qt.KeepAspectRatio,
+
         )
 
         self.centerOn(
+
             self._scene.pixmap_item()
+
         )
-        
+
         self._current_zoom = 1.0
 
         self._fit_mode = True
@@ -129,12 +136,13 @@ class ImageViewer(QGraphicsView):
     def current_image(self):
 
         return self._current_image
+
     # ---------------------------------------------------------
 
     def show_faces(
         self,
         faces: list[FaceDetection],
-    ) -> None:
+    ):
 
         self._scene.show_faces(faces)
 
@@ -143,55 +151,82 @@ class ImageViewer(QGraphicsView):
     def show_landmarks(
         self,
         landmarks: list[FaceLandmark],
-    ) -> None:
+    ):
 
-        self._scene.show_landmarks(landmarks)
+        self._scene.show_landmarks(
+            landmarks
+        )
 
     # ---------------------------------------------------------
 
-    def clear_landmarks(self) -> None:
+    def show_face_mesh(
+        self,
+        mesh: FaceMesh,
+    ):
+
+        self._scene.show_face_mesh(
+            mesh
+        )
+
+    # ---------------------------------------------------------
+
+    def clear_landmarks(self):
 
         self._scene.clear_landmarks()
+
     # ---------------------------------------------------------
 
-    def clear_faces(self) -> None:
+    def clear_faces(self):
 
         self._scene.clear_faces()
+
     # ---------------------------------------------------------
 
-    def _is_pan_button(self, event) -> bool:
-        """
-        Restituisce True se l'evento deve attivare il pan.
+    def clear_face_mesh(self):
 
-        In futuro questo metodo potrà essere esteso per supportare:
-        - Barra spaziatrice + tasto sinistro
-        - Mouse configurabile
-        - Tavoletta grafica
-        """
+        self._scene.clear_face_mesh()
+
+    # ---------------------------------------------------------
+
+    def _is_pan_button(
+        self,
+        event,
+    ):
+
         return event.button() == Qt.MiddleButton
+
     # ---------------------------------------------------------
 
     def wheelEvent(self, event):
 
         if not self._scene.has_image():
+
             return
 
         if event.angleDelta().y() > 0:
+
             factor = self.ZOOM_FACTOR
+
         else:
+
             factor = 1 / self.ZOOM_FACTOR
 
         new_zoom = self._current_zoom * factor
 
         if new_zoom < self.MIN_ZOOM:
+
             return
 
         if new_zoom > self.MAX_ZOOM:
+
             return
-        
+
         self._fit_mode = False
 
-        self.scale(factor, factor)
+        self.scale(
+            factor,
+            factor,
+        )
 
         self._current_zoom = new_zoom
 
@@ -224,11 +259,15 @@ class ImageViewer(QGraphicsView):
             self._last_mouse_pos = event.pos()
 
             self.horizontalScrollBar().setValue(
+
                 self.horizontalScrollBar().value() - delta.x()
+
             )
 
             self.verticalScrollBar().setValue(
+
                 self.verticalScrollBar().value() - delta.y()
+
             )
 
             event.accept()
