@@ -8,7 +8,7 @@ Autore:
 Marco Cantù
 
 Versione:
-1.0.0
+1.1.0
 ==========================================================
 """
 
@@ -19,8 +19,13 @@ from dataclasses import dataclass
 class Triangle:
     """
     Triangolo della mesh.
+
+    I valori rappresentano gli indici
+    dei tre vertici nella lista vertices.
     """
 
-    v1: int
-    v2: int
-    v3: int
+    a: int
+
+    b: int
+
+    c: int
