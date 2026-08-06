@@ -155,7 +155,8 @@ class MainWindow(QMainWindow):
 
             self.central_widget.project_panel.refresh()
 
-            self.central_widget.viewer_panel.viewer.clear()
+            self.central_widget.viewer_panel.image_viewer.clear()
+            self.central_widget.viewer_panel.mesh_viewer.clear()
 
             self.status_bar.showMessage(
                 "Project created",
@@ -205,7 +206,8 @@ class MainWindow(QMainWindow):
 
             self.central_widget.project_panel.refresh()
 
-            self.central_widget.viewer_panel.viewer.clear()
+            self.central_widget.viewer_panel.image_viewer.clear()
+            self.central_widget.viewer_panel.mesh_viewer.clear()
 
             QMessageBox.information(
                 self,

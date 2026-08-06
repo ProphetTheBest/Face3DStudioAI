@@ -8,9 +8,17 @@ Autore:
 Marco Cantù
 
 Versione:
-0.5.0
+0.6.0
 ==========================================================
 """
+
+from PySide6.QtCore import Qt
+
+from PySide6.QtWidgets import (
+    QSplitter,
+    QWidget,
+    QVBoxLayout,
+)
 
 from source.ai.services.face_analysis_service import (
     FaceAnalysisService,
@@ -20,12 +28,16 @@ from source.controllers.project_controller import (
     ProjectController,
 )
 
+from source.models import face
 from source.models.assets.image_asset import (
     ImageAsset,
 )
 
 from source.widgets.base_panel import BasePanel
+
 from source.widgets.image_viewer import ImageViewer
+
+from source.widgets.mesh_viewer import MeshViewer
 
 
 class ViewerPanel(BasePanel):
@@ -39,13 +51,46 @@ class ViewerPanel(BasePanel):
 
         self._controller = controller
 
-        self.viewer = ImageViewer()
-
         self._analysis_service = FaceAnalysisService()
 
-        self.add_content_widget(
-            self.viewer
+        #
+        # Viewer
+        #
+
+        self.image_viewer = ImageViewer()
+
+        self.mesh_viewer = MeshViewer()
+
+        #
+        # Splitter verticale
+        #
+
+        splitter = QSplitter(Qt.Vertical)
+
+        splitter.addWidget(
+            self.image_viewer
         )
+
+        splitter.addWidget(
+            self.mesh_viewer
+        )
+
+        splitter.setStretchFactor(0, 3)
+
+        splitter.setStretchFactor(1, 2)
+
+        splitter.setSizes([500, 300])        
+
+        container = QWidget()
+
+        layout = QVBoxLayout(container)
+
+        layout.setContentsMargins(0, 0, 0, 0)
+
+        layout.addWidget(splitter)
+
+        self.add_content_widget(container)
+    # ---------------------------------------------------------
 
     # ---------------------------------------------------------
 
@@ -55,7 +100,9 @@ class ViewerPanel(BasePanel):
 
         if filename is None:
 
-            self.viewer.clear()
+            self.image_viewer.clear()
+
+            self.mesh_viewer.clear()
 
             return
 
@@ -63,7 +110,9 @@ class ViewerPanel(BasePanel):
 
         if not isinstance(asset, ImageAsset):
 
-            self.viewer.clear()
+            self.image_viewer.clear()
+
+            self.mesh_viewer.clear()
 
             return
 
@@ -71,7 +120,7 @@ class ViewerPanel(BasePanel):
         # Visualizza immagine
         #
 
-        self.viewer.show_image(
+        self.image_viewer.show_image(
             filename
         )
 
@@ -88,7 +137,7 @@ class ViewerPanel(BasePanel):
         # Bounding Box
         #
 
-        self.viewer.show_faces(
+        self.image_viewer.show_faces(
 
             [
                 face.detection
@@ -99,7 +148,7 @@ class ViewerPanel(BasePanel):
         )
 
         #
-        # Mesh
+        # Primo volto
         #
 
         if asset.faces:
@@ -107,19 +156,31 @@ class ViewerPanel(BasePanel):
             face = asset.faces[0]
 
             #
-            # Wireframe
+            # Wireframe 2D
             #
 
             if face.mesh is not None:
 
-                self.viewer.show_face_mesh(
+                self.image_viewer.show_face_mesh(
+                    face.mesh
+                )
+
+                #
+                # Viewer 3D
+                #
+
+                self.mesh_viewer.show_mesh(
                     face.mesh
                 )
 
             #
-            # Landmark (temporaneo)
+            # Landmark
             #
 
-            self.viewer.show_landmarks(
+            self.image_viewer.show_landmarks(
                 face.landmarks
             )
+
+        else:
+
+            self.mesh_viewer.clear()
