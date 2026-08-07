@@ -162,7 +162,8 @@ class ViewerPanel(BasePanel):
             if face.mesh is not None:
 
                 self.image_viewer.show_face_mesh(
-                    face.mesh
+                    face.landmarks,
+                    face.mesh.edges,
                 )
 
                 #

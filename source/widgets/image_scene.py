@@ -162,15 +162,17 @@ class ImageScene(QGraphicsScene):
 
     # ---------------------------------------------------------
 
+    # ---------------------------------------------------------
+
     def show_face_mesh(
         self,
-        mesh: FaceMesh,
+        landmarks: list[FaceLandmark],
+        edges: list[tuple[int, int]],
     ):
 
         self.clear_face_mesh()
 
-        if mesh is None:
-
+        if not landmarks:
             return
 
         width = self._pixmap_item.pixmap().width()
@@ -179,10 +181,10 @@ class ImageScene(QGraphicsScene):
         pen = QPen(QColor(0, 180, 255))
         pen.setWidth(1)
 
-        for start, end in mesh.edges:
+        for start, end in edges:
 
-            p1 = mesh.vertices[start]
-            p2 = mesh.vertices[end]
+            p1 = landmarks[start]
+            p2 = landmarks[end]
 
             line = self.addLine(
                 p1.x * width,
@@ -191,6 +193,10 @@ class ImageScene(QGraphicsScene):
                 p2.y * height,
                 pen,
             )
+
+            line.setZValue(75)
+
+            self._mesh_items.append(line)
 
             line.setZValue(75)
 

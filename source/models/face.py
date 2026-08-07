@@ -8,11 +8,13 @@ Autore:
 Marco Cantù
 
 Versione:
-1.1.0
+1.2.0
 ==========================================================
 """
 
 from dataclasses import dataclass, field
+
+import numpy as np
 
 from source.ai.models.face_detection import FaceDetection
 from source.ai.models.face_landmark import FaceLandmark
@@ -23,12 +25,12 @@ from source.models.face_mesh import FaceMesh
 @dataclass
 class Face:
     """
-    Rappresenta un volto rilevato all'interno
-    di un ImageAsset.
+    Rappresenta un volto rilevato
+    all'interno di una immagine.
     """
 
     #
-    # Risultato Face Detection
+    # Face Detection
     #
 
     detection: FaceDetection
@@ -52,6 +54,18 @@ class Face:
     #
 
     mesh: FaceMesh | None = None
+
+    #
+    # Matrice di posa MediaPipe (4x4)
+    #
+
+    pose_matrix: np.ndarray | None = None
+
+    #
+    # BlendShapes
+    #
+
+    blendshapes: list | None = None
 
     #
     # Texture futura

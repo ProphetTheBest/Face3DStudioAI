@@ -161,11 +161,13 @@ class ImageViewer(QGraphicsView):
 
     def show_face_mesh(
         self,
-        mesh: FaceMesh,
+        landmarks: list[FaceLandmark],
+        edges: list[tuple[int, int]],
     ):
 
         self._scene.show_face_mesh(
-            mesh
+            landmarks,
+            edges,
         )
 
     # ---------------------------------------------------------

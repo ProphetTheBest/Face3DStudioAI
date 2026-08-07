@@ -50,6 +50,9 @@ class GeometryNormalizer:
         cy = (min_y + max_y) / 2
         cz = (min_z + max_z) / 2
 
+        print("\n===== NORMALIZER =====")
+        print(f"Center : {cx:.6f} {cy:.6f} {cz:.6f}")
+
         #
         # Scala
         #
@@ -64,6 +67,9 @@ class GeometryNormalizer:
 
         if size == 0:
             size = 1.0
+
+        print(f"Size   : {size:.6f}")
+        print("======================")
 
         #
         # Normalizzazione
