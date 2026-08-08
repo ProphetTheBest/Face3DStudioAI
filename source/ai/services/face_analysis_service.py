@@ -32,7 +32,6 @@ from source.models.assets.image_asset import ImageAsset
 from source.models.face import Face
 from source.models.geometry.vertex3d import Vertex3D
 
-
 class FaceAnalysisService:
     """
     Analizza un'immagine e costruisce

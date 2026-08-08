@@ -20,8 +20,9 @@ from PySide6.QtWidgets import (
     QWidget,
     QVBoxLayout,
     QHBoxLayout,
-    QPushButton,
+    QToolButton,
     QLabel,
+    QButtonGroup,
 )
 
 from source.models.face_mesh import FaceMesh
@@ -49,6 +50,13 @@ class MeshViewer(QWidget):
         #
 
         self._create_widgets()
+
+        #
+        # Toolbar configuration
+        #
+
+        self._configure_toolbar_buttons()
+
 
         #
         # OpenGL Viewer
@@ -98,28 +106,102 @@ class MeshViewer(QWidget):
         # Camera toolbar
         #
 
-        self._btn_front = QPushButton("Front")
+        self._btn_front = QToolButton()
+        self._btn_front.setText("Front")
 
-        self._btn_left = QPushButton("Left")
+        self._btn_left = QToolButton()
+        self._btn_left.setText("Left")
 
-        self._btn_right = QPushButton("Right")
+        self._btn_right = QToolButton()
+        self._btn_right.setText("Right")
 
-        self._btn_top = QPushButton("Top")
+        self._btn_top = QToolButton()
+        self._btn_top.setText("Top")
 
-        self._btn_iso = QPushButton("Iso")
+        self._btn_iso = QToolButton()
+        self._btn_iso.setText("Iso")
 
-        self._btn_reset = QPushButton("Reset")
+        self._btn_reset = QToolButton()
+        self._btn_reset.setText("Reset")
 
         #
         # Render toolbar
         #
 
-        self._btn_points = QPushButton("Points")
+        self._btn_points = QToolButton()
+        self._btn_points.setText("Points")
 
-        self._btn_wire = QPushButton("Wire")
+        self._btn_wire = QToolButton()
+        self._btn_wire.setText("Wire")
 
-        self._btn_mesh = QPushButton("Mesh")
-		
+        self._btn_mesh = QToolButton()
+        self._btn_mesh.setText("Mesh")
+
+    # ---------------------------------------------------------
+    # Toolbar
+    # ---------------------------------------------------------
+
+    def _configure_toolbar_buttons(self):
+
+        buttons = [
+
+            self._btn_front,
+            self._btn_left,
+            self._btn_right,
+            self._btn_top,
+            self._btn_iso,
+            self._btn_reset,
+
+            self._btn_points,
+            self._btn_wire,
+            self._btn_mesh,
+
+        ]
+
+        for button in buttons:
+
+            button.setMinimumWidth(70)
+
+            button.setCheckable(True)
+
+            if button is self._btn_reset:
+                button.setCheckable(False)
+
+            button.setAutoExclusive(False)	
+
+            #
+            # View buttons
+            #
+
+            self._view_group = QButtonGroup(self)
+
+            self._view_group.setExclusive(True)
+
+            self._view_group.addButton(self._btn_front)
+            self._view_group.addButton(self._btn_left)
+            self._view_group.addButton(self._btn_right)
+            self._view_group.addButton(self._btn_top)
+            self._view_group.addButton(self._btn_iso)
+
+            #
+            # Render buttons
+            #
+
+            self._render_group = QButtonGroup(self)
+
+            self._render_group.setExclusive(True)
+
+            self._render_group.addButton(self._btn_points)
+            self._render_group.addButton(self._btn_wire)
+            self._render_group.addButton(self._btn_mesh)
+
+            #
+            # Default buttons
+            #
+
+            self._btn_iso.setChecked(True)
+
+            self._btn_mesh.setChecked(True)            
     # ---------------------------------------------------------
     # Layout
     # ---------------------------------------------------------
