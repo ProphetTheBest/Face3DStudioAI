@@ -8,7 +8,7 @@ Autore:
 Marco Cantù
 
 Versione:
-3.0.0
+2.0.0
 ==========================================================
 """
 
@@ -34,8 +34,6 @@ class MeshViewer(QWidget):
     MODE_MESH = 2
 
     # ---------------------------------------------------------
-    # Construction
-    # ---------------------------------------------------------
 
     def __init__(
         self,
@@ -44,89 +42,15 @@ class MeshViewer(QWidget):
 
         super().__init__(parent)
 
-        #
-        # Widgets
-        #
-
         self._create_widgets()
 
-        #
-        # OpenGL Viewer
-        #
-
-        self._create_gl_view()
+        self._create_layout()
 
         #
         # Layout
         #
 
-        self._create_layout()
-
-        #
-        # Rendering mode
-        #
-
-        self._render_mode = self.MODE_MESH
-
-        #
-        # OpenGL objects
-        #
-
-        self._points_item = None
-
-        self._mesh_item = None
-
-        self._wireframe_item = None
-
-        #
-        # Mesh cache
-        #
-
-        self._mesh = None
-        #
-        # Signals
-        #
-
-        self._connect_signals()
-    # ---------------------------------------------------------
-    # Widgets
-    # ---------------------------------------------------------
-
-    def _create_widgets(self):
-
-        #
-        # Camera toolbar
-        #
-
-        self._btn_front = QPushButton("Front")
-
-        self._btn_left = QPushButton("Left")
-
-        self._btn_right = QPushButton("Right")
-
-        self._btn_top = QPushButton("Top")
-
-        self._btn_iso = QPushButton("Iso")
-
-        self._btn_reset = QPushButton("Reset")
-
-        #
-        # Render toolbar
-        #
-
-        self._btn_points = QPushButton("Points")
-
-        self._btn_wire = QPushButton("Wire")
-
-        self._btn_mesh = QPushButton("Mesh")
-		
-    # ---------------------------------------------------------
-    # Layout
-    # ---------------------------------------------------------
-
-    def _create_layout(self):
-
-        layout = QVBoxLayout(self)
+        # layout = QVBoxLayout(self)
 
         layout.setContentsMargins(
             0,
@@ -139,11 +63,18 @@ class MeshViewer(QWidget):
         # Toolbar - View
         #
 
-        toolbar_view = QHBoxLayout()
+        # toolbar_view = QHBoxLayout()
 
         toolbar_view.addWidget(
             QLabel("View:")
         )
+
+        # self._btn_front = QPushButton("Front")
+        # self._btn_left = QPushButton("Left")
+        # self._btn_right = QPushButton("Right")
+        # self._btn_top = QPushButton("Top")
+        # self._btn_iso = QPushButton("Iso")
+        # self._btn_reset = QPushButton("Reset")
 
         toolbar_view.addWidget(self._btn_front)
         toolbar_view.addWidget(self._btn_left)
@@ -154,19 +85,21 @@ class MeshViewer(QWidget):
 
         toolbar_view.addStretch()
 
-        layout.addLayout(
-            toolbar_view
-        )
+        layout.addLayout(toolbar_view)
 
         #
         # Toolbar - Render
         #
 
-        toolbar_render = QHBoxLayout()
+        # toolbar_render = QHBoxLayout()
 
         toolbar_render.addWidget(
             QLabel("Render:")
         )
+
+        self._btn_points = QPushButton("Points")
+        self._btn_wire = QPushButton("Wire")
+        self._btn_mesh = QPushButton("Mesh")
 
         toolbar_render.addWidget(self._btn_points)
         toolbar_render.addWidget(self._btn_wire)
@@ -174,36 +107,22 @@ class MeshViewer(QWidget):
 
         toolbar_render.addStretch()
 
-        layout.addLayout(
-            toolbar_render
-        )
+        layout.addLayout(toolbar_render)
 
         #
-        # OpenGL Viewer
+        # View OpenGL
         #
+
+        self._view = gl.GLViewWidget()
 
         layout.addWidget(
             self._view
         )
 
-    # ---------------------------------------------------------
-    # OpenGL
-    # ---------------------------------------------------------
-
-    def _create_gl_view(self):
-
-        #
-        # Viewer
-        #
-
-        self._view = gl.GLViewWidget()
-
-        self._view.setBackgroundColor("k")
-
-        self._view.opts["fov"] = 45
-
         #
         # Camera
+        #
+
         #
 
         self.reset_camera()
@@ -229,7 +148,7 @@ class MeshViewer(QWidget):
         )
 
         #
-        # Axis
+        # Assi XYZ
         #
 
         self._axis = gl.GLAxisItem()
@@ -244,8 +163,125 @@ class MeshViewer(QWidget):
             self._axis
         )
 
+        #
+        # Modalità rendering
+        #
+
+        self._render_mode = self.MODE_MESH
+
+        #
+        # Oggetti OpenGL
+        #
+
+        self._points_item = None
+
+        self._mesh_item = None
+
+        self._wireframe_item = None
+
+        #
+        # Cache mesh
+        #
+
+        self._mesh = None
+
+        #
+        # Signals
+        #
+
+        self._connect_signals()
     # ---------------------------------------------------------
-    # Signals
+
+    def set_render_mode(
+        self,
+        mode: int,
+    ):
+
+        self._render_mode = mode
+
+        if self._mesh is not None:
+
+            self.show_mesh(
+                self._mesh
+            )
+
+
+    # ---------------------------------------------------------
+
+    def _create_widgets(self):
+
+        #
+        # Toolbar - View
+        #
+
+        self._btn_front = QPushButton("Front")
+        self._btn_left = QPushButton("Left")
+        self._btn_right = QPushButton("Right")
+        self._btn_top = QPushButton("Top")
+        self._btn_iso = QPushButton("Iso")
+        self._btn_reset = QPushButton("Reset")
+
+        #
+        # Toolbar - Render
+        #
+
+        self._btn_points = QPushButton("Points")
+        self._btn_wire = QPushButton("Wire")
+        self._btn_mesh = QPushButton("Mesh")
+
+    # ---------------------------------------------------------
+
+    def _create_layout(self):
+
+        layout = QVBoxLayout(self)
+
+        #
+        # Toolbar - View
+        #
+
+        toolbar_view = QHBoxLayout()
+
+        toolbar_view.addWidget(
+            QLabel("View:")
+        )
+
+        toolbar_view.addWidget(self._btn_front)
+        toolbar_view.addWidget(self._btn_left)
+        toolbar_view.addWidget(self._btn_right)
+        toolbar_view.addWidget(self._btn_top)
+        toolbar_view.addWidget(self._btn_iso)
+        toolbar_view.addWidget(self._btn_reset)
+
+        toolbar_view.addStretch()
+
+        layout.addLayout(toolbar_view)
+
+        #
+        # Toolbar - Render
+        #
+
+        toolbar_render = QHBoxLayout()
+
+        toolbar_render.addWidget(
+            QLabel("Render:")
+        )
+
+        toolbar_render.addWidget(self._btn_points)
+        toolbar_render.addWidget(self._btn_wire)
+        toolbar_render.addWidget(self._btn_mesh)
+
+        toolbar_render.addStretch()
+
+        layout.addLayout(toolbar_render)
+
+        #
+        # OpenGL Viewer
+        #
+
+        layout.addWidget(
+            self._view
+        )
+
     # ---------------------------------------------------------
 
     def _connect_signals(self):
@@ -299,33 +335,9 @@ class MeshViewer(QWidget):
                 self.MODE_MESH
             )
         )
-
     # ---------------------------------------------------------
-    # Rendering
-    # ---------------------------------------------------------
-
-    def set_render_mode(
-        self,
-        mode: int,
-    ):
-
-        self._render_mode = mode
-
-        if self._mesh is not None:
-
-            self.show_mesh(
-                self._mesh
-            )
-
-    # ---------------------------------------------------------
-    # Utilities
-    # ---------------------------------------------------------
-
     def clear(self):
 
-        #
-        # Point Cloud
-        #
         if self._points_item is not None:
 
             self._view.removeItem(
@@ -334,9 +346,6 @@ class MeshViewer(QWidget):
 
             self._points_item = None
 
-        #
-        # Solid Mesh
-        #
         if self._mesh_item is not None:
 
             self._view.removeItem(
@@ -345,9 +354,6 @@ class MeshViewer(QWidget):
 
             self._mesh_item = None
 
-        #
-        # Wireframe
-        #
         if self._wireframe_item is not None:
 
             self._view.removeItem(
@@ -357,14 +363,13 @@ class MeshViewer(QWidget):
             self._wireframe_item = None
 
     # ---------------------------------------------------------
-    # Camera
-    # ---------------------------------------------------------
 
     def reset_camera(self):
 
         self.set_isometric_view()
-
+        
     # ---------------------------------------------------------
+
 
     def set_front_view(self):
 
@@ -415,8 +420,6 @@ class MeshViewer(QWidget):
         )
 
     # ---------------------------------------------------------
-    # Rendering
-    # ---------------------------------------------------------
 
     def show_mesh(
         self,
@@ -426,44 +429,53 @@ class MeshViewer(QWidget):
         self.clear()
 
         if mesh is None:
-            return
 
-        #
-        # Cache
-        #
+            return
 
         self._mesh = mesh
 
         #
-        # Vertices
+        # Conversione vertici
         #
 
         vertices = np.array(
+
             [
+
                 [
-                    vertex.x,
-                    vertex.y,
-                    vertex.z,
+                    v.x,
+                    v.y,
+                    v.z,
                 ]
-                for vertex in mesh.vertices
+
+                for v in mesh.vertices
+
             ],
+
             dtype=np.float32,
+
         )
 
         #
-        # Triangles
+        # Triangoli
         #
 
         faces = np.array(
+
             [
+
                 [
-                    triangle.a,
-                    triangle.b,
-                    triangle.c,
+                    t.a,
+                    t.b,
+                    t.c,
                 ]
-                for triangle in mesh.triangles
+
+                for t in mesh.triangles
+
             ],
+
             dtype=np.int32,
+
         )
 
         #
@@ -473,10 +485,15 @@ class MeshViewer(QWidget):
         if self._render_mode == self.MODE_POINTS:
 
             self._points_item = gl.GLScatterPlotItem(
+
                 pos=vertices,
+
                 size=5,
+
                 color=(1.0, 1.0, 0.0, 1.0),
+
                 pxMode=True,
+
             )
 
             self._view.addItem(
@@ -486,26 +503,35 @@ class MeshViewer(QWidget):
             return
 
         #
-        # MeshData
+        # MESH TRIANGOLATA
         #
 
-        mesh_data = gl.MeshData(
+        meshdata = gl.MeshData(
+
             vertexes=vertices,
+
             faces=faces,
+
         )
 
         #
-        # SOLID MESH
+        # Mesh piena
         #
 
         if self._render_mode == self.MODE_MESH:
 
             self._mesh_item = gl.GLMeshItem(
-                meshdata=mesh_data,
+
+                meshdata=meshdata,
+
                 smooth=False,
+
                 drawFaces=True,
+
                 drawEdges=False,
+
                 shader="shaded",
+
             )
 
             self._view.addItem(
@@ -515,16 +541,21 @@ class MeshViewer(QWidget):
             return
 
         #
-        # WIREFRAME
+        # Wireframe
         #
 
         if self._render_mode == self.MODE_WIREFRAME:
 
             self._wireframe_item = gl.GLMeshItem(
-                meshdata=mesh_data,
+
+                meshdata=meshdata,
+
                 smooth=False,
+
                 drawFaces=False,
+
                 drawEdges=True,
+
             )
 
             self._view.addItem(
@@ -532,13 +563,4 @@ class MeshViewer(QWidget):
             )
 
             return
-
-            #
-            # Unknown rendering mode
-            #
-
-            raise ValueError(
-                f"Unsupported render mode: {self._render_mode}"
-            )
-
-			
+		

@@ -20,7 +20,10 @@ from PySide6.QtWidgets import (
     QWidget,
     QHBoxLayout,
     QVBoxLayout,
+    QSplitter,
 )
+
+from PySide6.QtCore import Qt
 
 from source.controllers.application_controller import ApplicationController
 
@@ -98,16 +101,29 @@ class CentralWidget(QWidget):
         Costruisce il layout principale.
         """
 
-        right_layout = QVBoxLayout()
+        #
+        # Splitter verticale
+        #
 
-        right_layout.addWidget(
-            self.viewer_panel,
-            8,
+        right_splitter = QSplitter(Qt.Orientation.Vertical)
+
+        right_splitter.addWidget(
+            self.viewer_panel
         )
 
-        right_layout.addWidget(
-            self.log_panel,
-            2,
+        right_splitter.addWidget(
+            self.log_panel
+        )
+
+        #
+        # Dimensioni iniziali
+        #
+
+        right_splitter.setSizes(
+            [
+                900,
+                120,
+            ]
         )
 
         main_layout = QHBoxLayout()
@@ -117,8 +133,8 @@ class CentralWidget(QWidget):
             2,
         )
 
-        main_layout.addLayout(
-            right_layout,
+        main_layout.addWidget(
+            right_splitter,
             6,
         )
 
