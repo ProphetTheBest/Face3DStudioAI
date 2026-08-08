@@ -38,6 +38,10 @@ class ImageViewer(QGraphicsView):
 
         self.setScene(self._scene)
 
+        def scene(self) -> ImageScene:
+
+            return self._scene
+
         self._current_image = None
 
         self._current_zoom = 1.0

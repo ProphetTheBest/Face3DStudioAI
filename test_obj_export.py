@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from source.io.obj_exporter import ObjExporter
+from source.io.exporters.obj_exporter import ObjExporter
 from source.models.face_mesh import FaceMesh
 from source.models.vertex import Vertex
 from source.models.triangle import Triangle

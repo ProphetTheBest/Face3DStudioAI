@@ -65,6 +65,7 @@ class MainWindow(QMainWindow):
         self.action_new_project = QAction("New Project...", self)
         self.action_open_project = QAction("Open Project...", self)
         self.action_import_photos = QAction("Import Photos...", self)
+        self.action_export_obj = QAction("Export OBJ...", self)
         self.action_save_project = QAction("Save", self)
         self.action_save_project_as = QAction("Save As...", self)
         self.action_exit = QAction("Exit", self)
@@ -75,6 +76,8 @@ class MainWindow(QMainWindow):
         file_menu.addSeparator()
 
         file_menu.addAction(self.action_import_photos)
+
+        file_menu.addAction(self.action_export_obj)
 
         file_menu.addSeparator()
 
@@ -95,6 +98,10 @@ class MainWindow(QMainWindow):
 
         self.action_import_photos.triggered.connect(
             self._on_import_photos
+        )
+
+        self.action_export_obj.triggered.connect(
+            self._on_export_obj
         )
 
         self.action_exit.triggered.connect(
@@ -276,3 +283,27 @@ class MainWindow(QMainWindow):
             )
 
             raise
+    # -----------------------------------------------------
+
+    def _on_export_obj(self) -> None:
+        """
+        Gestisce il comando File -> Export OBJ.
+        """
+
+        project_controller = (
+            self.app_controller.get_project_controller()
+        )
+
+        face = project_controller.get_current_face()
+
+        if face is None:
+
+            QMessageBox.warning(
+                self,
+                "Export OBJ",
+                "No face selected."
+            )
+
+            return
+
+        print("Current Face OK")    

@@ -59,6 +59,10 @@ class ViewerPanel(BasePanel):
 
         self.image_viewer = ImageViewer()
 
+        self.image_viewer.scene().face_selected.connect(
+            self._on_face_selected
+        )
+
         self.mesh_viewer = MeshViewer()
 
         #
@@ -138,13 +142,7 @@ class ViewerPanel(BasePanel):
         #
 
         self.image_viewer.show_faces(
-
-            [
-                face.detection
-
-                for face in asset.faces
-            ]
-
+            asset.faces
         )
 
         #
@@ -154,6 +152,8 @@ class ViewerPanel(BasePanel):
         if asset.faces:
 
             face = asset.faces[0]
+
+            self._controller.set_current_face(face)
 
             #
             # Wireframe 2D
@@ -185,3 +185,38 @@ class ViewerPanel(BasePanel):
         else:
 
             self.mesh_viewer.clear()
+
+    # ---------------------------------------------------------
+
+    # ---------------------------------------------------------
+
+    def _on_face_selected(self, face) -> None:
+        """
+        Gestisce la selezione di un volto tramite click
+        sul bounding box.
+        """
+
+        self._controller.set_current_face(face)
+
+        #
+        # Mesh 2D
+        #
+
+        if face.mesh is not None:
+
+            self.image_viewer.show_face_mesh(
+                face.landmarks,
+                face.mesh.edges,
+            )
+
+            self.mesh_viewer.show_mesh(
+                face.mesh
+            )
+
+        #
+        # Landmarks
+        #
+
+        self.image_viewer.show_landmarks(
+            face.landmarks
+        )         

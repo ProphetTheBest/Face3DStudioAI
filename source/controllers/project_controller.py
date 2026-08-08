@@ -29,6 +29,7 @@ class ProjectController:
     ) -> None:
         
         self._current_asset: Asset | None = None
+        self._current_face = None
         self._image_importer = ImageImporter()
         self._project_manager = project_manager
 
@@ -129,6 +130,8 @@ class ProjectController:
 
         self._current_asset = asset
 
+        self._current_face = None
+
     # ---------------------------------------------------------
 
     def get_current_asset(self) -> Asset | None:
@@ -137,6 +140,27 @@ class ProjectController:
         """
 
         return self._current_asset
+
+    # ---------------------------------------------------------
+
+    def set_current_face(
+        self,
+        face,
+    ) -> None:
+        """
+        Imposta il volto attualmente selezionato.
+        """
+
+        self._current_face = face
+
+    # ---------------------------------------------------------
+
+    def get_current_face(self):
+        """
+        Restituisce il volto attualmente selezionato.
+        """
+
+        return self._current_face    
     # ---------------------------------------------------------
 
     def get_current_asset_path(self) -> str | None:
@@ -167,6 +191,8 @@ class ProjectController:
         """
 
         self._current_asset = None
+
+        self._current_face = None
 
     def import_images(self, file_list: list[str]) -> None:
 

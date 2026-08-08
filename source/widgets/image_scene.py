@@ -12,7 +12,7 @@ Versione:
 ==========================================================
 """
 
-from PySide6.QtCore import QRectF
+from PySide6.QtCore import QRectF, Signal
 from PySide6.QtGui import QColor, QPen, QPixmap, QBrush
 from PySide6.QtWidgets import (
     QGraphicsEllipseItem,
@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (
 from source.ai.models.face_detection import FaceDetection
 from source.ai.models.face_landmark import FaceLandmark
 from source.models.face_mesh import FaceMesh
+from source.models.face import Face
 
 
 class ImageScene(QGraphicsScene):
@@ -32,6 +33,8 @@ class ImageScene(QGraphicsScene):
     Scena grafica contenente tutti gli elementi
     visualizzati nel Viewer.
     """
+
+    face_selected = Signal(object)
 
     def __init__(self, parent=None):
 
@@ -42,6 +45,8 @@ class ImageScene(QGraphicsScene):
         self.addItem(self._pixmap_item)
 
         self._face_items: list[QGraphicsRectItem] = []
+
+        self._face_map = {}
 
         self._landmark_items: list[QGraphicsEllipseItem] = []
 
@@ -102,6 +107,8 @@ class ImageScene(QGraphicsScene):
             self.removeItem(item)
 
         self._face_items.clear()
+
+        self._face_map.clear()
 
     # ---------------------------------------------------------
 
@@ -207,7 +214,7 @@ class ImageScene(QGraphicsScene):
 
     def show_faces(
         self,
-        faces: list[FaceDetection],
+        faces: list[Face],
     ):
 
         self.clear_faces()
@@ -217,11 +224,13 @@ class ImageScene(QGraphicsScene):
 
         for face in faces:
 
+            detection = face.detection
+
             rect = self.addRect(
-                face.x,
-                face.y,
-                face.width,
-                face.height,
+                detection.x,
+                detection.y,
+                detection.width,
+                detection.height,
                 pen,
             )
 
@@ -229,6 +238,28 @@ class ImageScene(QGraphicsScene):
 
             self._face_items.append(rect)
 
+            self._face_map[rect] = face
+
+    # ---------------------------------------------------------
+
+    def mousePressEvent(self, event):
+
+        item = self.itemAt(
+            event.scenePos(),
+            self.views()[0].transform(),
+        )
+
+        if item in self._face_map:
+
+            self.face_selected.emit(
+                self._face_map[item]
+            )
+
+            event.accept()
+
+            return
+
+        super().mousePressEvent(event)
     # ---------------------------------------------------------
 
     def image_rect(self):
