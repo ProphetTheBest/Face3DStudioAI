@@ -16,6 +16,7 @@ from dataclasses import dataclass, field
 
 from source.models.geometry.vertex3d import Vertex3D
 from source.models.geometry.triangle import Triangle
+from source.models.uv_coordinate import UVCoordinate
 
 
 @dataclass(slots=True)
@@ -48,5 +49,13 @@ class FaceMesh:
     #
 
     triangles: list[Triangle] = field(
+        default_factory=list
+    )
+
+    #
+    # Coordinate UV
+    #
+
+    uv_coordinates: list[UVCoordinate] = field(
         default_factory=list
     )

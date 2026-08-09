@@ -26,9 +26,14 @@ from PySide6.QtWidgets import (
 )
 
 from source.controllers.application_controller import ApplicationController
+from source.controllers.diagnostics.diagnostics_controller import (
+    DiagnosticsController,
+)
 from source.dialogs.new_project_dialog import NewProjectDialog
 from source.widgets.central_widget import CentralWidget
-
+from source.services.exporting.face_export_service import (
+    FaceExportService,
+)
 
 class MainWindow(QMainWindow):
     """
@@ -66,6 +71,12 @@ class MainWindow(QMainWindow):
         self.action_open_project = QAction("Open Project...", self)
         self.action_import_photos = QAction("Import Photos...", self)
         self.action_export_obj = QAction("Export OBJ...", self)
+
+        self.action_face_diagnostics = QAction(
+            "Face Diagnostics...",
+            self
+        )
+
         self.action_save_project = QAction("Save", self)
         self.action_save_project_as = QAction("Save As...", self)
         self.action_exit = QAction("Exit", self)
@@ -104,6 +115,10 @@ class MainWindow(QMainWindow):
             self._on_export_obj
         )
 
+        self.action_face_diagnostics.triggered.connect(
+            self._on_face_diagnostics
+        )
+
         self.action_exit.triggered.connect(
             self.close
         )
@@ -111,7 +126,13 @@ class MainWindow(QMainWindow):
         menu_bar.addMenu("&Edit")
         menu_bar.addMenu("&View")
         menu_bar.addMenu("&AI")
-        menu_bar.addMenu("&Tools")
+
+        tools_menu = menu_bar.addMenu("&Tools")
+
+        tools_menu.addAction(
+            self.action_face_diagnostics
+        )
+
         menu_bar.addMenu("&Help")
 
     # -----------------------------------------------------
@@ -306,4 +327,67 @@ class MainWindow(QMainWindow):
 
             return
 
-        print("Current Face OK")    
+        if face.mesh is None:
+
+            QMessageBox.warning(
+                self,
+                "Export OBJ",
+                "The selected face has no mesh."
+            )
+
+            return
+
+        filename, _ = QFileDialog.getSaveFileName(
+            self,
+            "Export OBJ",
+            "face.obj",
+            "Wavefront OBJ (*.obj)"
+        )
+
+        if not filename:
+            return
+
+        try:
+
+            project_controller.export_current_face(
+                filename,
+            )
+
+            self.status_bar.showMessage(
+                "OBJ exported successfully.",
+                3000
+            )
+
+            QMessageBox.information(
+                self,
+                "Export OBJ",
+                "OBJ exported successfully."
+            )
+
+        except Exception as e:
+
+            QMessageBox.critical(
+                self,
+                "Export OBJ",
+                str(e)
+            )
+
+            raise
+
+    # -----------------------------------------------------
+
+    def _on_face_diagnostics(self) -> None:
+        """
+        Gestisce il comando Tools -> Face Diagnostics.
+        """
+
+        project_controller = (
+            self.app_controller.get_project_controller()
+        )
+
+        face = project_controller.get_current_face()
+
+        DiagnosticsController.show(
+            face,
+            self,
+        )       

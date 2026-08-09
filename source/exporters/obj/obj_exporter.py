@@ -35,6 +35,14 @@ class ObjExporter:
             encoding="utf-8",
         ) as file:
 
+            mtl_name = path.with_suffix(
+                ".mtl"
+            ).name
+
+            file.write(
+                f"mtllib {mtl_name}\n\n"
+            )
+
             file.write("# Face3D Studio AI\n")
             file.write("# OBJ Export\n\n")
 
@@ -53,16 +61,42 @@ class ObjExporter:
                 )
 
             #
+            # Coordinate UV
+            #
+
+            for uv in mesh.uv_coordinates:
+
+                file.write(
+
+                    f"vt {uv.u:.6f} "
+                    f"{uv.v:.6f}\n"
+
+                )
+
+            file.write("\n")
+
+            #
             # Triangoli
             #
 
+            file.write(
+                "usemtl FaceMaterial\n\n"
+            )
+
             for triangle in mesh.triangles:
+
+                a = triangle.a + 1
+                b = triangle.b + 1
+                c = triangle.c + 1
 
                 file.write(
 
                     f"f "
-                    f"{triangle.a+1} "
-                    f"{triangle.b+1} "
-                    f"{triangle.c+1}\n"
+
+                    f"{a}/{a} "
+
+                    f"{b}/{b} "
+
+                    f"{c}/{c}\n"
 
                 )

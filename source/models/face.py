@@ -68,6 +68,14 @@ class Face:
     blendshapes: list | None = None
 
     #
+    # Analysis Reports
+    #
+
+    geometry_report = None
+
+    landmark_report = None
+
+    #
     # Texture futura
     #
 

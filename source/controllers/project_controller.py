@@ -183,6 +183,49 @@ class ProjectController:
         return str(
             Path(project.project_folder) / asset.relative_path
         )
+
+    # ---------------------------------------------------------
+
+    def export_current_face(
+        self,
+        output_filename: str,
+    ) -> None:
+        """
+        Esporta il volto corrente.
+        """
+
+        asset = self.get_current_asset()
+
+        if asset is None:
+            raise RuntimeError(
+                "No current asset."
+            )
+
+        face = self.get_current_face()
+
+        if face is None:
+            raise RuntimeError(
+                "No current face."
+            )
+
+        image_path = self.get_current_asset_path()
+
+        if image_path is None:
+            raise RuntimeError(
+                "Image path not available."
+            )
+
+        from source.services.exporting.face_export_service import (
+            FaceExportService,
+        )
+
+        FaceExportService.export_obj(
+            asset,
+            face,
+            image_path,
+            output_filename,
+        )
+            
     # ---------------------------------------------------------
 
     def clear_current_asset(self) -> None:
