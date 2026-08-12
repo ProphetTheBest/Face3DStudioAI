@@ -8,13 +8,13 @@ Autore:
 Marco Cantù
 
 Versione:
-3.0.0
+3.2.6
 ==========================================================
 """
 
 import numpy as np
-
 import pyqtgraph.opengl as gl
+from pyqtgraph.opengl import shaders as gl_shaders
 
 from PySide6.QtWidgets import (
     QWidget,
@@ -25,10 +25,180 @@ from PySide6.QtWidgets import (
     QButtonGroup,
 )
 
+from PySide6.QtCore import (
+    Qt,
+    Signal,
+)
+
 from source.models.face_mesh import FaceMesh
 
 
+# -------------------------------------------------------------
+# Face shading
+# -------------------------------------------------------------
+#
+# PyQtGraph 0.14.0's built-in "shaded" shader uses a fixed
+# light direction of (1, -1, -1) and only 20% ambient light.
+# For a face/landmark inspection viewer this produces very
+# dark areas on the mesh.
+#
+# This shader keeps the same PyQtGraph shader interface but
+# uses a soft camera-relative key + fill light and a much
+# stronger ambient component.
+#
+_FACE_INSPECTION_SHADER = None
+
+
+def _get_face_inspection_shader():
+    """
+    Return the custom face-inspection shader.
+
+    The shader is intentionally small and self-contained.
+    It uses exactly the attributes/uniforms expected by
+    GLMeshItem in PyQtGraph 0.14.0.
+    """
+
+    global _FACE_INSPECTION_SHADER
+
+    if _FACE_INSPECTION_SHADER is None:
+
+        _FACE_INSPECTION_SHADER = (
+            gl_shaders.ShaderProgram(
+                "faceInspectionShaded",
+                [
+                    gl_shaders.VertexShader(
+                        """
+                        uniform mat4 u_mvp;
+                        uniform mat3 u_normal;
+
+                        attribute vec4 a_position;
+                        attribute vec3 a_normal;
+                        attribute vec4 a_color;
+
+                        varying vec4 v_color;
+                        varying vec3 v_normal;
+
+                        void main()
+                        {
+                            v_normal =
+                                normalize(
+                                    u_normal * a_normal
+                                );
+
+                            v_color = a_color;
+
+                            gl_Position =
+                                u_mvp * a_position;
+                        }
+                        """
+                    ),
+
+                    gl_shaders.FragmentShader(
+                        """
+                        #ifdef GL_ES
+                        precision mediump float;
+                        #endif
+
+                        varying vec4 v_color;
+                        varying vec3 v_normal;
+
+                        void main()
+                        {
+                            /*
+                             * The normal is already in view space.
+                             * The camera looks toward -Z, therefore
+                             * +Z is the useful front-light direction.
+                             */
+
+                            vec3 keyDirection =
+                                normalize(
+                                    vec3(
+                                        0.15,
+                                        -0.20,
+                                        1.0
+                                    )
+                                );
+
+                            vec3 fillDirection =
+                                normalize(
+                                    vec3(
+                                        -0.55,
+                                        0.30,
+                                        0.75
+                                    )
+                                );
+
+                            float key =
+                                max(
+                                    dot(
+                                        v_normal,
+                                        keyDirection
+                                    ),
+                                    0.0
+                                );
+
+                            float fill =
+                                max(
+                                    dot(
+                                        v_normal,
+                                        fillDirection
+                                    ),
+                                    0.0
+                                );
+
+                            /*
+                             * Strong ambient component:
+                             * no part of the face can fall into
+                             * the almost-black range of the
+                             * original shader.
+                             */
+
+                            float lighting =
+                                0.55
+                                + (0.32 * key)
+                                + (0.18 * fill);
+
+                            lighting =
+                                clamp(
+                                    lighting,
+                                    0.0,
+                                    1.0
+                                );
+
+                            vec3 rgb =
+                                v_color.rgb
+                                * lighting;
+
+                            gl_FragColor =
+                                vec4(
+                                    rgb,
+                                    v_color.a
+                                );
+                        }
+                        """
+                    ),
+                ]
+            )
+        )
+
+    return _FACE_INSPECTION_SHADER
+
+
 class MeshViewer(QWidget):
+    """
+    Viewer 3D della mesh facciale.
+
+    Responsabilità:
+    - visualizzazione della mesh;
+    - visualizzazione point cloud;
+    - visualizzazione wireframe;
+    - gestione della camera;
+    - gestione della selezione di un vertice.
+
+    Il MeshViewer non modifica la mesh originale.
+    """
+
+    viewport_clicked = Signal(int, int)
 
     MODE_POINTS = 0
     MODE_WIREFRAME = 1
@@ -41,9 +211,12 @@ class MeshViewer(QWidget):
     def __init__(
         self,
         parent=None,
+        show_guides=True,
     ):
 
         super().__init__(parent)
+
+        self._show_guides = show_guides
 
         #
         # Widgets
@@ -56,7 +229,6 @@ class MeshViewer(QWidget):
         #
 
         self._configure_toolbar_buttons()
-
 
         #
         # OpenGL Viewer
@@ -81,21 +253,77 @@ class MeshViewer(QWidget):
         #
 
         self._points_item = None
-
         self._mesh_item = None
-
         self._wireframe_item = None
+
+        #
+        # Selected vertex marker
+        #
+
+        self._selected_vertex_item = None
+        self._selected_vertex_index = None
+
+        #
+        # Vertice associato attualmente visualizzato.
+        #
+        # È separato da _selected_vertex_index perché il marker
+        # azzurro è una visualizzazione di controllo di una
+        # mappatura esistente e NON una selezione temporanea.
+        #
+        self._mapped_vertex_index = None
+
+        #
+        # Stato del mouse.
+        #
+        # Il click sinistro ha due possibili significati:
+        #
+        # - click semplice -> selezione/picking del vertice;
+        # - trascinamento -> rotazione della mesh.
+        #
+        # Il picking viene quindi deciso al rilascio del mouse,
+        # dopo aver verificato se il puntatore si è mosso oltre
+        # una piccola soglia.
+        #
+
+        self._mouse_press_pos = None
+        self._mouse_dragging = False
+        self._mouse_drag_threshold = 5
+
+        #
+        # Stato del PAN.
+        #
+        # Il pan viene attivato in due modi:
+        #
+        # - tasto centrale del mouse + trascinamento;
+        # - CTRL + tasto sinistro + trascinamento.
+        #
+        # In entrambi i casi spostiamo il centro della camera
+        # mantenendo invariati distanza, azimut ed elevazione.
+        #
+        self._mouse_pan_active = False
+        self._mouse_pan_pos = None
 
         #
         # Mesh cache
         #
 
         self._mesh = None
+
+        #
+        # Centered vertex positions
+        #
+        # Queste sono le coordinate realmente utilizzate
+        # dal renderer OpenGL.
+        #
+
+        self._vertex_positions = None
+
         #
         # Signals
         #
 
         self._connect_signals()
+
     # ---------------------------------------------------------
     # Widgets
     # ---------------------------------------------------------
@@ -167,41 +395,42 @@ class MeshViewer(QWidget):
             if button is self._btn_reset:
                 button.setCheckable(False)
 
-            button.setAutoExclusive(False)	
+            button.setAutoExclusive(False)
 
-            #
-            # View buttons
-            #
+        #
+        # View buttons
+        #
 
-            self._view_group = QButtonGroup(self)
+        self._view_group = QButtonGroup(self)
 
-            self._view_group.setExclusive(True)
+        self._view_group.setExclusive(True)
 
-            self._view_group.addButton(self._btn_front)
-            self._view_group.addButton(self._btn_left)
-            self._view_group.addButton(self._btn_right)
-            self._view_group.addButton(self._btn_top)
-            self._view_group.addButton(self._btn_iso)
+        self._view_group.addButton(self._btn_front)
+        self._view_group.addButton(self._btn_left)
+        self._view_group.addButton(self._btn_right)
+        self._view_group.addButton(self._btn_top)
+        self._view_group.addButton(self._btn_iso)
 
-            #
-            # Render buttons
-            #
+        #
+        # Render buttons
+        #
 
-            self._render_group = QButtonGroup(self)
+        self._render_group = QButtonGroup(self)
 
-            self._render_group.setExclusive(True)
+        self._render_group.setExclusive(True)
 
-            self._render_group.addButton(self._btn_points)
-            self._render_group.addButton(self._btn_wire)
-            self._render_group.addButton(self._btn_mesh)
+        self._render_group.addButton(self._btn_points)
+        self._render_group.addButton(self._btn_wire)
+        self._render_group.addButton(self._btn_mesh)
 
-            #
-            # Default buttons
-            #
+        #
+        # Default buttons
+        #
 
-            self._btn_iso.setChecked(True)
+        self._btn_iso.setChecked(True)
 
-            self._btn_mesh.setChecked(True)            
+        self._btn_mesh.setChecked(True)
+
     # ---------------------------------------------------------
     # Layout
     # ---------------------------------------------------------
@@ -280,6 +509,10 @@ class MeshViewer(QWidget):
 
         self._view = gl.GLViewWidget()
 
+        self._view.mousePressEvent = self._mouse_press_event
+        self._view.mouseMoveEvent = self._mouse_move_event
+        self._view.mouseReleaseEvent = self._mouse_release_event
+
         self._view.setBackgroundColor("k")
 
         self._view.opts["fov"] = 45
@@ -294,37 +527,49 @@ class MeshViewer(QWidget):
         # Grid
         #
 
-        self._grid = gl.GLGridItem()
+        if self._show_guides:
 
-        self._grid.setSize(
-            2,
-            2,
-        )
+            self._grid = gl.GLGridItem()
 
-        self._grid.setSpacing(
-            0.1,
-            0.1,
-        )
+            self._grid.setSize(
+                2,
+                2,
+            )
 
-        self._view.addItem(
-            self._grid
-        )
+            self._grid.setSpacing(
+                0.1,
+                0.1,
+            )
+
+            self._view.addItem(
+                self._grid
+            )
+
+        else:
+
+            self._grid = None
 
         #
         # Axis
         #
 
-        self._axis = gl.GLAxisItem()
+        if self._show_guides:
 
-        self._axis.setSize(
-            0.5,
-            0.5,
-            0.5,
-        )
+            self._axis = gl.GLAxisItem()
 
-        self._view.addItem(
-            self._axis
-        )
+            self._axis.setSize(
+                0.5,
+                0.5,
+                0.5,
+            )
+
+            self._view.addItem(
+                self._axis
+            )
+
+        else:
+
+            self._axis = None
 
     # ---------------------------------------------------------
     # Signals
@@ -400,6 +645,245 @@ class MeshViewer(QWidget):
             )
 
     # ---------------------------------------------------------
+    # Vertex selection
+    # ---------------------------------------------------------
+
+    def select_vertex(
+        self,
+        vertex_index: int,
+    ):
+        """
+        Seleziona visivamente un vertice della mesh.
+
+        Parameters
+        ----------
+        vertex_index:
+            Indice del vertice nella lista mesh.vertices.
+
+        La selezione non modifica la mesh.
+        Viene semplicemente aggiunto un marker
+        tridimensionale nel punto corrispondente.
+        """
+
+        #
+        # Nessuna mesh caricata
+        #
+
+        if self._mesh is None:
+
+            self.clear_selected_vertex()
+
+            return
+
+        #
+        # Nessuna posizione disponibile
+        #
+
+        if self._vertex_positions is None:
+
+            self.clear_selected_vertex()
+
+            return
+
+        #
+        # Controllo indice
+        #
+
+        if vertex_index < 0:
+
+            self.clear_selected_vertex()
+
+            return
+
+        if vertex_index >= len(
+            self._vertex_positions
+        ):
+
+            self.clear_selected_vertex()
+
+            return
+
+        #
+        # Rimuove il marker precedente
+        #
+
+        self.clear_selected_vertex()
+
+        #
+        # Memorizza l'indice
+        #
+
+        self._selected_vertex_index = vertex_index
+
+        #
+        # Recupera la posizione OpenGL
+        #
+
+        position = self._vertex_positions[
+            vertex_index
+        ]
+
+        #
+        # Crea il marker
+        #
+
+        marker_position = np.array(
+            [position],
+            dtype=np.float32,
+        )
+
+        self._selected_vertex_item = (
+            gl.GLScatterPlotItem(
+                pos=marker_position,
+                size=14,
+                color=(
+                    1.0,
+                    0.0,
+                    0.0,
+                    1.0,
+                ),
+                pxMode=True,
+            )
+        )
+
+        #
+        # Aggiunge il marker alla scena
+        #
+
+        self._view.addItem(
+            self._selected_vertex_item
+        )
+
+    # ---------------------------------------------------------
+
+    def select_mapped_vertex(
+        self,
+        vertex_index: int,
+    ):
+        """
+        Visualizza in AZZURRO un vertice già associato a un landmark.
+
+        Questa visualizzazione è distinta dalla selezione temporanea
+        utilizzata durante una nuova associazione.
+
+        Importante:
+        - non modifica _selected_vertex_index;
+        - non abilita il pulsante "Associa";
+        - serve esclusivamente per controllare/dissociare
+          una mappatura già esistente.
+        """
+
+        #
+        # Nessuna mesh caricata.
+        #
+        if self._mesh is None:
+            return
+
+        #
+        # Nessuna posizione disponibile.
+        #
+        if self._vertex_positions is None:
+            return
+
+        #
+        # Controllo indice.
+        #
+        if vertex_index < 0:
+            return
+
+        if vertex_index >= len(
+            self._vertex_positions
+        ):
+            return
+
+        #
+        # Rimuove l'eventuale marker precedente.
+        #
+        self.clear_selected_vertex()
+
+        #
+        # Memorizza separatamente il vertice associato.
+        #
+        # Questo valore verrà utilizzato da show_mesh() per
+        # ricreare il marker dopo un cambio di modalità
+        # Points / Wire / Mesh.
+        #
+        self._mapped_vertex_index = vertex_index
+
+        #
+        # Recupera la posizione OpenGL.
+        #
+        position = self._vertex_positions[
+            vertex_index
+        ]
+
+        marker_position = np.array(
+            [position],
+            dtype=np.float32,
+        )
+
+        #
+        # Marker AZZURRO.
+        #
+        self._selected_vertex_item = (
+            gl.GLScatterPlotItem(
+                pos=marker_position,
+                size=14,
+                color=(
+                    0.0,
+                    0.8,
+                    1.0,
+                    1.0,
+                ),
+                pxMode=True,
+            )
+        )
+
+        self._view.addItem(
+            self._selected_vertex_item
+        )
+
+        #
+        # NON impostiamo _selected_vertex_index.
+        #
+        # Il punto azzurro è una visualizzazione di controllo
+        # di una mappatura esistente, non una nuova selezione
+        # temporanea destinata al pulsante "Associa".
+        #
+
+    # ---------------------------------------------------------
+
+    def clear_selected_vertex(self):
+        """
+        Rimuove il marker del vertice selezionato.
+        """
+
+        if self._selected_vertex_item is not None:
+
+            self._view.removeItem(
+                self._selected_vertex_item
+            )
+
+            self._selected_vertex_item = None
+
+        self._selected_vertex_index = None
+        self._mapped_vertex_index = None
+
+    # ---------------------------------------------------------
+
+    def selected_vertex_index(self):
+        """
+        Restituisce l'indice del vertice selezionato.
+
+        Returns
+        -------
+        int | None
+            Indice del vertice oppure None.
+        """
+
+        return self._selected_vertex_index
+
+    # ---------------------------------------------------------
     # Utilities
     # ---------------------------------------------------------
 
@@ -408,6 +892,7 @@ class MeshViewer(QWidget):
         #
         # Point Cloud
         #
+
         if self._points_item is not None:
 
             self._view.removeItem(
@@ -419,6 +904,7 @@ class MeshViewer(QWidget):
         #
         # Solid Mesh
         #
+
         if self._mesh_item is not None:
 
             self._view.removeItem(
@@ -430,6 +916,7 @@ class MeshViewer(QWidget):
         #
         # Wireframe
         #
+
         if self._wireframe_item is not None:
 
             self._view.removeItem(
@@ -437,6 +924,18 @@ class MeshViewer(QWidget):
             )
 
             self._wireframe_item = None
+
+        #
+        # Selected vertex
+        #
+
+        self.clear_selected_vertex()
+
+        #
+        # Coordinate cache
+        #
+
+        self._vertex_positions = None
 
     # ---------------------------------------------------------
     # Camera
@@ -505,9 +1004,33 @@ class MeshViewer(QWidget):
         mesh: FaceMesh,
     ):
 
+        #
+        # Memorizziamo l'indice selezionato prima
+        # di ricostruire la scena.
+        #
+
+        selected_vertex_index = (
+            self._selected_vertex_index
+        )
+
+        #
+        # Memorizziamo anche l'eventuale vertice associato
+        # visualizzato in AZZURRO.
+        #
+        mapped_vertex_index = (
+            self._mapped_vertex_index
+        )
+
+        #
+        # Pulizia della scena
+        #
+
         self.clear()
 
         if mesh is None:
+
+            self._mesh = None
+
             return
 
         #
@@ -533,6 +1056,38 @@ class MeshViewer(QWidget):
         )
 
         #
+        # Controllo mesh vuota
+        #
+
+        if len(vertices) == 0:
+
+            self._vertex_positions = None
+
+            return
+
+        #
+        # Center mesh for visualization
+        #
+
+        min_corner = vertices.min(axis=0)
+
+        max_corner = vertices.max(axis=0)
+
+        center = (
+            min_corner
+            + max_corner
+        ) * 0.5
+
+        vertices = vertices - center
+
+        #
+        # Memorizza le coordinate effettivamente
+        # utilizzate dal renderer.
+        #
+
+        self._vertex_positions = vertices.copy()
+
+        #
         # Triangles
         #
 
@@ -554,73 +1109,334 @@ class MeshViewer(QWidget):
 
         if self._render_mode == self.MODE_POINTS:
 
-            self._points_item = gl.GLScatterPlotItem(
-                pos=vertices,
-                size=5,
-                color=(1.0, 1.0, 0.0, 1.0),
-                pxMode=True,
+            self._points_item = (
+                gl.GLScatterPlotItem(
+                    pos=vertices,
+                    size=5,
+                    color=(
+                        1.0,
+                        1.0,
+                        0.0,
+                        1.0,
+                    ),
+                    pxMode=True,
+                )
             )
 
             self._view.addItem(
                 self._points_item
             )
 
-            return
-
         #
         # MeshData
         #
 
-        mesh_data = gl.MeshData(
-            vertexes=vertices,
-            faces=faces,
-        )
+        else:
 
-        #
-        # SOLID MESH
-        #
-
-        if self._render_mode == self.MODE_MESH:
-
-            self._mesh_item = gl.GLMeshItem(
-                meshdata=mesh_data,
-                smooth=False,
-                drawFaces=True,
-                drawEdges=False,
-                shader="shaded",
+            mesh_data = gl.MeshData(
+                vertexes=vertices,
+                faces=faces,
             )
 
-            self._view.addItem(
-                self._mesh_item
-            )
+            #
+            # SOLID MESH
+            #
 
-            return
+            if self._render_mode == self.MODE_MESH:
 
-        #
-        # WIREFRAME
-        #
+                self._mesh_item = (
+                    gl.GLMeshItem(
+                        meshdata=mesh_data,
+                        smooth=True,
+                        drawFaces=True,
+                        drawEdges=False,
+                        shader=_get_face_inspection_shader(),
+                    )
+                )
 
-        if self._render_mode == self.MODE_WIREFRAME:
+                self._view.addItem(
+                    self._mesh_item
+                )
 
-            self._wireframe_item = gl.GLMeshItem(
-                meshdata=mesh_data,
-                smooth=False,
-                drawFaces=False,
-                drawEdges=True,
-            )
+            #
+            # WIREFRAME
+            #
 
-            self._view.addItem(
-                self._wireframe_item
-            )
+            elif (
+                self._render_mode
+                == self.MODE_WIREFRAME
+            ):
 
-            return
+                self._wireframe_item = (
+                    gl.GLMeshItem(
+                        meshdata=mesh_data,
+                        smooth=False,
+                        drawFaces=False,
+                        drawEdges=True,
+                    )
+                )
+
+                self._view.addItem(
+                    self._wireframe_item
+                )
 
             #
             # Unknown rendering mode
             #
 
-            raise ValueError(
-                f"Unsupported render mode: {self._render_mode}"
+            else:
+
+                raise ValueError(
+                    "Unsupported render mode: "
+                    f"{self._render_mode}"
+                )
+
+        #
+        # Ripristina la selezione precedente.
+        #
+        # Questo è importante quando l'utente cambia
+        # modalità di rendering.
+        #
+
+        if mapped_vertex_index is not None:
+
+            self.select_mapped_vertex(
+                mapped_vertex_index
             )
 
-			
+        elif selected_vertex_index is not None:
+
+            self.select_vertex(
+                selected_vertex_index
+            )
+
+    # ---------------------------------------------------------
+    # Mouse
+    # ---------------------------------------------------------
+
+    def _mouse_press_event(self, event):
+        """
+        Gestisce l'inizio dell'interazione con il mouse.
+
+        Modalità supportate:
+
+        1. Click sinistro semplice:
+           selezione/picking del vertice.
+
+        2. Click sinistro + trascinamento:
+           rotazione della mesh.
+
+        3. Tasto centrale + trascinamento:
+           PAN della mesh.
+
+        4. CTRL + tasto sinistro + trascinamento:
+           PAN della mesh.
+
+        Il PAN viene gestito esplicitamente da MeshViewer invece
+        di delegarlo completamente a GLViewWidget. In questo modo
+        il comportamento rimane deterministico anche dopo zoom,
+        rotazioni e riapertura del Vertex Mapper.
+        """
+
+        #
+        # Tasto centrale -> PAN.
+        #
+        if event.button() == Qt.MiddleButton:
+
+            self._mouse_pan_active = True
+            self._mouse_pan_pos = event.position()
+
+            event.accept()
+
+            return
+
+        #
+        # Tasto sinistro + CTRL -> PAN.
+        #
+        if (
+            event.button() == Qt.LeftButton
+            and event.modifiers() & Qt.ControlModifier
+        ):
+
+            self._mouse_pan_active = True
+            self._mouse_pan_pos = event.position()
+
+            #
+            # Non impostiamo _mouse_press_pos perché questo
+            # gesto non deve mai generare un picking.
+            #
+
+            event.accept()
+
+            return
+
+        #
+        # Tasto sinistro normale.
+        #
+        if event.button() == Qt.LeftButton:
+
+            self._mouse_press_pos = event.position()
+            self._mouse_dragging = False
+
+        #
+        # Rotazione / gestione standard di GLViewWidget.
+        #
+        gl.GLViewWidget.mousePressEvent(
+            self._view,
+            event,
+        )
+
+    # ---------------------------------------------------------
+
+    def _mouse_move_event(self, event):
+        """
+        Gestisce il trascinamento del mouse.
+
+        PAN:
+            tasto centrale
+            oppure CTRL + tasto sinistro.
+
+        ROTAZIONE:
+            tasto sinistro normale.
+
+        PICKING:
+            viene deciso esclusivamente al rilascio del tasto
+            sinistro quando non è stato effettuato un trascinamento.
+        """
+
+        #
+        # PAN esplicito.
+        #
+        if self._mouse_pan_active:
+
+            if self._mouse_pan_pos is None:
+                return
+
+            current_pos = event.position()
+
+            delta = (
+                current_pos
+                - self._mouse_pan_pos
+            )
+
+            #
+            # Aggiorniamo subito il riferimento per ottenere
+            # un movimento fluido e proporzionale al mouse.
+            #
+            self._mouse_pan_pos = current_pos
+
+            #
+            # Pan relativo alla vista:
+            #
+            #   +X -> destra
+            #   +Y -> alto
+            #
+            # Il metodo pan() di GLViewWidget modifica il
+            # centro della camera senza alterare zoom e
+            # orientamento.
+            #
+            self._view.pan(
+                delta.x(),
+                delta.y(),
+                0,
+                relative="view",
+            )
+
+            event.accept()
+
+            return
+
+        #
+        # ROTAZIONE.
+        #
+        if (
+            self._mouse_press_pos is not None
+            and event.buttons() & Qt.LeftButton
+        ):
+
+            delta = (
+                event.position()
+                - self._mouse_press_pos
+            )
+
+            if (
+                abs(delta.x()) >= self._mouse_drag_threshold
+                or
+                abs(delta.y()) >= self._mouse_drag_threshold
+            ):
+
+                self._mouse_dragging = True
+
+        gl.GLViewWidget.mouseMoveEvent(
+            self._view,
+            event,
+        )
+
+    # ---------------------------------------------------------
+
+    def _mouse_release_event(self, event):
+        """
+        Completa l'interazione con il mouse.
+
+        PAN:
+            termina il gesto e non produce picking.
+
+        CLICK:
+            se il tasto sinistro viene rilasciato senza
+            trascinamento, viene emesso viewport_clicked.
+
+        ROTAZIONE:
+            se il mouse è stato trascinato, nessun picking.
+        """
+
+        #
+        # Fine PAN.
+        #
+        if (
+            self._mouse_pan_active
+            and (
+                event.button() == Qt.MiddleButton
+                or event.button() == Qt.LeftButton
+            )
+        ):
+
+            self._mouse_pan_active = False
+            self._mouse_pan_pos = None
+
+            event.accept()
+
+            return
+
+        #
+        # Picking soltanto per il click sinistro normale.
+        #
+        should_pick = (
+            event.button() == Qt.LeftButton
+            and self._mouse_press_pos is not None
+            and not self._mouse_dragging
+        )
+
+        if should_pick:
+
+            self.viewport_clicked.emit(
+                int(event.position().x()),
+                int(event.position().y()),
+            )
+
+        #
+        # Lasciamo completare a GLViewWidget la normale
+        # gestione del rilascio dopo il picking.
+        #
+        gl.GLViewWidget.mouseReleaseEvent(
+            self._view,
+            event,
+        )
+
+        #
+        # Reset stato click/rotazione.
+        #
+        if event.button() == Qt.LeftButton:
+
+            self._mouse_press_pos = None
+            self._mouse_dragging = False
+

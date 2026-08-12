@@ -12,7 +12,7 @@ Autore:
 Marco Cantù
 
 Versione:
-0.0.9
+0.0.11
 ==========================================================
 """
 
@@ -30,6 +30,13 @@ from source.controllers.diagnostics.diagnostics_controller import (
     DiagnosticsController,
 )
 from source.dialogs.new_project_dialog import NewProjectDialog
+from source.dialogs.vertex_mapper_dialog import (
+    VertexMapperDialog,
+)
+
+from source.models.mapping.vertex_mapping_collection import (
+    VertexMappingCollection,
+)
 from source.widgets.central_widget import CentralWidget
 from source.services.exporting.face_export_service import (
     FaceExportService,
@@ -45,6 +52,9 @@ class MainWindow(QMainWindow):
         super().__init__()
 
         self.app_controller = app_controller
+
+        self._vertex_mapping_collection = VertexMappingCollection()
+        self._vertex_mapper_dialog = None
 
         self._create_window()
         self._create_menu()
@@ -74,6 +84,11 @@ class MainWindow(QMainWindow):
 
         self.action_face_diagnostics = QAction(
             "Face Diagnostics...",
+            self
+        )
+
+        self.action_vertex_mapper = QAction(
+            "Vertex Mapper...",
             self
         )
 
@@ -119,6 +134,10 @@ class MainWindow(QMainWindow):
             self._on_face_diagnostics
         )
 
+        self.action_vertex_mapper.triggered.connect(
+            self._on_vertex_mapper
+        )
+
         self.action_exit.triggered.connect(
             self.close
         )
@@ -131,6 +150,10 @@ class MainWindow(QMainWindow):
 
         tools_menu.addAction(
             self.action_face_diagnostics
+        )
+
+        tools_menu.addAction(
+            self.action_vertex_mapper
         )
 
         menu_bar.addMenu("&Help")
@@ -391,3 +414,46 @@ class MainWindow(QMainWindow):
             face,
             self,
         )       
+
+    # -----------------------------------------------------
+
+    def _on_vertex_mapper(self) -> None:
+        """
+        Apre il Vertex Mapper.
+
+        Il dialog viene creato una sola volta durante la vita
+        della MainWindow. La chiusura lo nasconde, ma non
+        distrugge il GLViewWidget e quindi non forza la
+        ricreazione del contesto OpenGL.
+
+        Alla riapertura viene riutilizzata la stessa viewport.
+        """
+
+        if self._vertex_mapper_dialog is None:
+
+            self._vertex_mapper_dialog = (
+                VertexMapperDialog(
+                    mapping_collection=(
+                        self._vertex_mapping_collection
+                    ),
+                    parent=self,
+                )
+            )
+
+        #
+        # Riutilizziamo sempre la stessa istanza.
+        #
+
+        self._vertex_mapper_dialog.show()
+
+        self._vertex_mapper_dialog.raise_()
+
+        self._vertex_mapper_dialog.activateWindow()
+
+        #
+        # Richiediamo un nuovo paint della viewport.
+        #
+
+        self._vertex_mapper_dialog._refresh_viewer_after_show()
+
+    # -----------------------------------------------------

@@ -8,7 +8,7 @@ Autore:
 Marco Cantù
 
 Versione:
-1.4.0
+1.5.0
 ==========================================================
 """
 
@@ -27,6 +27,11 @@ from source.ai.services.detection_service import (
 from source.models.geometry.builders.face_mesh_builder import (
     FaceMeshBuilder,
 )
+
+from source.reconstruction.pipeline.head_reconstruction_pipeline import (
+    HeadReconstructionPipeline,
+)
+
 from source.mapping.uv.uv_mapper import UVMapper
 
 from source.models.assets.image_asset import ImageAsset
@@ -34,6 +39,7 @@ from source.models.face import Face
 from source.models.geometry.vertex3d import Vertex3D
 from source.analysis.geometry.geometry_analyzer import GeometryAnalyzer
 from source.analysis.landmarks.landmark_analyzer import LandmarkAnalyzer
+
 
 class FaceAnalysisService:
     """
@@ -79,6 +85,19 @@ class FaceAnalysisService:
 
                 face.landmarks = landmarks
 
+                #
+                # Nuovo:
+                # salviamo già i dati restituiti da MediaPipe.
+                #
+
+                face.pose_matrix = (
+                    self._face_mesh.last_pose_matrix
+                )
+
+                face.blendshapes = (
+                    self._face_mesh.last_blendshapes
+                )
+
                 vertices = [
 
                     Vertex3D(
@@ -95,21 +114,33 @@ class FaceAnalysisService:
                     vertices
                 )
 
+                #
+                # Il Reconstruction Engine
+                # ora lavora sull'intero volto.
+                #
+
+                face = HeadReconstructionPipeline.build(
+                    face
+                )
+
                 UVMapper.generate(
                     face
                 )
 
                 #
-                # Analisi geometrica (temporaneamente in console)
+                # Analisi
                 #
 
-                face.landmark_report = LandmarkAnalyzer.analyze(
-                    face
+                face.landmark_report = (
+                    LandmarkAnalyzer.analyze(
+                        face
+                    )
                 )
 
-                face.geometry_report = GeometryAnalyzer.analyze(
-                    face
+                face.geometry_report = (
+                    GeometryAnalyzer.analyze(
+                        face
+                    )
                 )
-
 
             image_asset.faces.append(face)
