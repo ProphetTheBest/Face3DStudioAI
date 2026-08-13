@@ -122,3 +122,56 @@ Data: 12/08/2026
 ### Stato della milestone
 
 [x] Vertex Mapper - Interactive MediaPipe Mapping completato e verificato.
+
+---
+
+## Vertex Mapper - Anatomical Mapping Filters
+
+Data: 13/08/2026
+
+Versione: VertexMapperDialog 1.8.0
+
+### Nuove funzionalita
+
+- Aggiunta la visualizzazione dei mapping tramite filtro anatomico.
+- Aggiunta la modalità di visualizzazione "Nessuno".
+- Aggiunta la modalità "Solo landmark corrente".
+- Aggiunta la modalità "Tutti i landmark associati".
+- Aggiunti i gruppi anatomici Volto, Naso, Occhio destro,
+  Occhio sinistro, Bocca, Sopracciglio destro e Sopracciglio sinistro.
+- I gruppi anatomici vengono derivati dai nomi semantici
+  dei LandmarkDefinition già presenti nel LandmarkCatalog.
+
+### Miglioramenti
+
+- La revisione delle associazioni può ora essere effettuata
+  isolando una singola regione anatomica.
+- I filtri operano esclusivamente sulla visualizzazione
+  dei marker e non modificano la VertexMappingCollection.
+- Non vengono duplicati nella GUI gli indici MediaPipe già
+  definiti nel catalogo dei landmark.
+- Il workflow esistente di associazione, dissociazione, picking,
+  report e mappa MediaPipe interattiva rimane invariato.
+
+### Test
+
+- Verifica modalità Nessuno.
+- Verifica modalità Solo landmark corrente.
+- Verifica modalità Tutti i landmark associati.
+- Verifica filtro Volto.
+- Verifica filtro Naso.
+- Verifica filtro Occhio destro.
+- Verifica filtro Occhio sinistro.
+- Verifica filtro Bocca.
+- Verifica filtro Sopracciglio destro.
+- Verifica filtro Sopracciglio sinistro.
+- Verifica del cambio ripetuto tra i diversi filtri.
+- Verifica che i filtri non modifichino le associazioni esistenti.
+- Verifica completa del Vertex Mapper dopo l'integrazione dei filtri.
+
+### Stato della milestone
+
+[x] Vertex Mapper 1.8.0 - Filtri anatomici dei mapping completati e verificati.
+
+Il Vertex Mapper è ora pronto per la prosecuzione dello Sprint 19,
+con il completamento progressivo delle 25 associazioni MediaPipe ↔ MakeHuman.

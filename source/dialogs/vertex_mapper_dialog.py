@@ -18,7 +18,7 @@ Autore:
 Marco Cantù
 
 Versione:
-1.6.4
+1.8.0
 ==========================================================
 """
 
@@ -257,6 +257,105 @@ class VertexMapperDialog(QDialog):
 
         layout.addWidget(
             self.landmark_combo
+        )
+
+        # -----------------------------------------------------
+        # Visualizzazione delle mappature
+        # -----------------------------------------------------
+        #
+        # Il MeshViewer supporta la visualizzazione contemporanea
+        # di più vertici associati.
+        #
+        # In questa versione offriamo la visualizzazione:
+        #
+        # - Nessuno
+        # - Solo landmark corrente
+        # - Tutti
+        # - per gruppo anatomico
+        #
+        # I gruppi vengono determinati dal nome semantico del
+        # LandmarkDefinition già presente nel catalogo. In questo
+        # modo non introduciamo una seconda lista di landmark nella
+        # GUI e non modifichiamo la persistenza del mapping.
+        #
+
+        mapping_display_label = QLabel(
+            "Visualizzazione mapping:"
+        )
+
+        layout.addWidget(
+            mapping_display_label
+        )
+
+        self.mapping_display_combo = QComboBox()
+
+        self.mapping_display_combo.addItem(
+            "Nessuno",
+            "none",
+        )
+
+        self.mapping_display_combo.addItem(
+            "Solo landmark corrente",
+            "current",
+        )
+
+        self.mapping_display_combo.addItem(
+            "Tutti",
+            "all",
+        )
+
+        self.mapping_display_combo.addItem(
+            "Volto",
+            "face",
+        )
+
+        self.mapping_display_combo.addItem(
+            "Naso",
+            "nose",
+        )
+
+        self.mapping_display_combo.addItem(
+            "Occhio destro",
+            "right_eye",
+        )
+
+        self.mapping_display_combo.addItem(
+            "Occhio sinistro",
+            "left_eye",
+        )
+
+        self.mapping_display_combo.addItem(
+            "Bocca",
+            "mouth",
+        )
+
+        self.mapping_display_combo.addItem(
+            "Sopracciglio destro",
+            "right_eyebrow",
+        )
+
+        self.mapping_display_combo.addItem(
+            "Sopracciglio sinistro",
+            "left_eyebrow",
+        )
+
+        #
+        # Manteniamo come comportamento predefinito quello
+        # precedente: mostrare il mapping del landmark corrente.
+        #
+
+        self.mapping_display_combo.setCurrentIndex(
+            self.mapping_display_combo.findData(
+                "current"
+            )
+        )
+
+        self.mapping_display_combo.currentIndexChanged.connect(
+            self._on_mapping_display_changed
+        )
+
+        layout.addWidget(
+            self.mapping_display_combo
         )
 
         #
@@ -504,6 +603,14 @@ class VertexMapperDialog(QDialog):
 
         self.mesh_viewer.clear_selected_vertex()
 
+        #
+        # I marker blu dei mapping sono gestiti separatamente
+        # dalla selezione temporanea rossa.
+        #
+        # La loro visualizzazione viene aggiornata alla fine
+        # del metodo in base alla modalità scelta dall'utente.
+        #
+
         self._selected_vertex_index = None
         self._selected_vertex = None
         self._selected_pick_result = None
@@ -580,6 +687,7 @@ class VertexMapperDialog(QDialog):
         self._refresh_landmark_panel()
         self._refresh_progress_label()
         self._update_map_button_state()
+        self._refresh_mapped_markers()
 
     # ---------------------------------------------------------
     # Viewport click
@@ -624,15 +732,228 @@ class VertexMapperDialog(QDialog):
         mapped=self.mapping_collection.count()
         self.progress_label.setText(f"Mappatura volto: <b>{mapped} / {total}</b> landmark associati")
 
-    def _show_existing_mapping_marker(self):
-        if self._selected_landmark_index is None:
+    def _on_mapping_display_changed(
+        self,
+        combo_index: int,
+    ):
+        """
+        Aggiorna la visualizzazione dei marker associati
+        quando l'utente cambia la modalità di visualizzazione.
+        """
+
+        self._refresh_mapped_markers()
+
+    # ---------------------------------------------------------
+
+    def _refresh_mapped_markers(self):
+        """
+        Aggiorna esclusivamente i marker blu dei mapping.
+
+        La mappatura nel modello non viene modificata.
+
+        Modalità supportate
+        -------------------
+        none
+            Nessun marker associato.
+
+        current
+            Solo il marker del landmark correntemente selezionato,
+            se esiste una mappatura.
+
+        all
+            Tutti i vertici associati presenti nella collection.
+
+        face / nose / right_eye / left_eye / mouth /
+        right_eyebrow / left_eyebrow
+            Solo i vertici associati appartenenti al gruppo
+            anatomico selezionato.
+        """
+
+        if not hasattr(
+            self,
+            "mapping_display_combo",
+        ):
             return
-        mapping=self.mapping_collection.get_by_landmark(self._selected_landmark_index)
-        if mapping is not None:
-            self.mesh_viewer.select_mapped_vertex(mapping.vertex_index)
+
+        mode = (
+            self.mapping_display_combo.currentData()
+        )
+
+        if mode == "none":
+
+            self.mesh_viewer.clear_mapped_vertices()
+
+            return
+
+        if mode == "current":
+
+            if self._selected_landmark_index is None:
+
+                self.mesh_viewer.clear_mapped_vertices()
+
+                return
+
+            mapping = (
+                self.mapping_collection.get_by_landmark(
+                    self._selected_landmark_index
+                )
+            )
+
+            if mapping is None:
+
+                self.mesh_viewer.clear_mapped_vertices()
+
+                return
+
+            self.mesh_viewer.show_mapped_vertices(
+                [mapping.vertex_index]
+            )
+
+            return
+
+        if mode == "all":
+
+            vertex_indices = [
+                mapping.vertex_index
+                for mapping in self.mapping_collection.all()
+            ]
+
+            self.mesh_viewer.show_mapped_vertices(
+                vertex_indices
+            )
+
+            return
+
+        #
+        # Filtri anatomici.
+        #
+        # Il filtro lavora sui LandmarkDefinition del catalogo,
+        # non sui vertex index. Questo mantiene separati:
+        #
+        #   landmark semantico -> vertex associato -> visualizzazione
+        #
+        # e permette di cambiare un'associazione senza dover
+        # modificare la logica della GUI.
+        #
+
+        anatomical_modes = {
+            "face",
+            "nose",
+            "right_eye",
+            "left_eye",
+            "mouth",
+            "right_eyebrow",
+            "left_eyebrow",
+        }
+
+        if mode in anatomical_modes:
+
+            vertex_indices = []
+
+            for mapping in self.mapping_collection.all():
+
+                landmark = (
+                    self.landmark_catalog.get_by_index(
+                        mapping.landmark_index
+                    )
+                )
+
+                if landmark is None:
+                    continue
+
+                if (
+                    self._get_landmark_group(landmark)
+                    == mode
+                ):
+                    vertex_indices.append(
+                        mapping.vertex_index
+                    )
+
+            self.mesh_viewer.show_mapped_vertices(
+                vertex_indices
+            )
+
+            return
+
+        #
+        # Modalità sconosciuta: per sicurezza non mostriamo
+        # marker associati.
+        #
+
+        self.mesh_viewer.clear_mapped_vertices()
+
+    # ---------------------------------------------------------
+
+    def _get_landmark_group(
+        self,
+        landmark,
+    ) -> str | None:
+        """
+        Restituisce il gruppo anatomico del landmark.
+
+        Il catalogo standard usa nomi semantici coerenti per i
+        25 Control Points. Il raggruppamento della GUI viene quindi
+        ricavato da tali nomi, evitando una duplicazione degli
+        indici MediaPipe.
+
+        Gruppi restituiti
+        ------------------
+        face
+        nose
+        right_eye
+        left_eye
+        mouth
+        right_eyebrow
+        left_eyebrow
+        """
+
+        name = landmark.name
+
+        if name in {
+            "forehead_center",
+            "chin",
+        }:
+            return "face"
+
+        if name.startswith("nose_"):
+            return "nose"
+
+        if name.startswith("right_eye_"):
+            return "right_eye"
+
+        if name.startswith("left_eye_"):
+            return "left_eye"
+
+        if name.startswith("mouth_"):
+            return "mouth"
+
+        if name in {
+            "upper_lip_center",
+            "lower_lip_center",
+            "upper_lip_left",
+            "upper_lip_right",
+        }:
+            return "mouth"
+
+        if name.startswith("right_eyebrow_"):
+            return "right_eyebrow"
+
+        if name.startswith("left_eyebrow_"):
+            return "left_eyebrow"
+
+        return None
+
+    # ---------------------------------------------------------
+
+    # Manteniamo il metodo per compatibilità con il flusso
+    # esistente del dialog.
+    def _show_existing_mapping_marker(self):
+        self._refresh_mapped_markers()
+
+    # ---------------------------------------------------------
 
     def _refresh_viewer_after_show(self):
-        self._show_existing_mapping_marker()
+        self._refresh_mapped_markers()
 
     def _on_show_report(self):
         dialog=MappingReportDialog(self.landmark_catalog,self.mapping_collection,self)
@@ -1122,6 +1443,7 @@ class VertexMapperDialog(QDialog):
         self._refresh_landmark_panel()
         self._refresh_progress_label()
         self._update_map_button_state()
+        self._refresh_mapped_markers()
 
     # ---------------------------------------------------------
     # Remove mapping
@@ -1227,6 +1549,7 @@ class VertexMapperDialog(QDialog):
         self._refresh_landmark_panel()
         self._refresh_progress_label()
         self._update_map_button_state()
+        self._refresh_mapped_markers()
 
     # ---------------------------------------------------------
     # Selected vertex

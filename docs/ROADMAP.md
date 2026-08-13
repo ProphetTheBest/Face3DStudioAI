@@ -11,10 +11,10 @@ Technical Lead AI:
 ChatGPT
 
 Versione documento:
-2.0
+2.2
 
 Ultimo aggiornamento:
-Agosto 2026
+13/08/2026
 
 Stato:
 Roadmap riallineato alla reale architettura del progetto e alla nuova
@@ -834,10 +834,11 @@ per la successiva costruzione del Canonical Mapping.
 
 Versione corrente:
 
-    VertexMapperDialog 1.6.4
+    VertexMapperDialog 1.8.0
 
-La versione 1.6.4 comprende anche l'integrazione con la
-mappa grafica interattiva dei landmark MediaPipe.
+La versione 1.8.0 comprende l'integrazione con la
+mappa grafica interattiva dei landmark MediaPipe e
+la visualizzazione dei mapping tramite filtri anatomici.
 
 ---
 
@@ -867,7 +868,13 @@ Il Vertex Mapper attualmente supporta:
 - gestione dell'illuminazione;
 - report delle associazioni;
 - visualizzazione della mappa MediaPipe;
-- selezione interattiva dei Control Points dalla mappa.
+- selezione interattiva dei Control Points dalla mappa;
+- filtro di visualizzazione per landmark corrente;
+- visualizzazione di tutti i landmark associati;
+- visualizzazione dei mapping per gruppo anatomico;
+- gruppi anatomici: Volto, Naso, Occhio destro, Occhio sinistro,
+  Bocca, Sopracciglio destro e Sopracciglio sinistro;
+- aggiornamento dinamico dei marker in base al filtro selezionato.
 
 ---
 
@@ -985,6 +992,84 @@ della finestra.
 
 Questo permette di mantenere corretta la selezione
 anche quando la finestra viene ridimensionata.
+
+---
+
+## Filtri anatomici dei mapping
+
+La versione 1.8.0 introduce una modalità di visualizzazione
+filtrata dei mapping già presenti nella VertexMappingCollection.
+
+La ComboBox di visualizzazione supporta ora:
+
+    Nessuno
+    Solo landmark corrente
+    Tutti i landmark associati
+    Volto
+    Naso
+    Occhio destro
+    Occhio sinistro
+    Bocca
+    Sopracciglio destro
+    Sopracciglio sinistro
+
+I filtri anatomici non modificano le associazioni e non introducono
+una seconda sorgente dei dati. Il filtro opera esclusivamente
+sulla visualizzazione dei marker già presenti nella collection.
+
+La classificazione anatomica utilizza i nomi semantici dei
+LandmarkDefinition già definiti dal progetto. In questo modo
+la GUI non duplica gli indici MediaPipe e rimane coerente
+con il LandmarkCatalog.
+
+Il filtro è particolarmente utile durante la costruzione
+e la verifica progressiva delle 25 associazioni, perché permette
+di isolare una regione anatomica senza nascondere o modificare
+i mapping esistenti.
+
+### Gruppi attualmente disponibili
+
+    Volto
+        forehead_center
+        chin
+
+    Naso
+        nose_tip
+        nose_bridge
+        nose_lower_center
+        nose_left_base
+        nose_right_base
+
+    Occhio destro
+        right_eye_outer
+        right_eye_inner
+        right_eye_upper
+        right_eye_lower
+
+    Occhio sinistro
+        left_eye_outer
+        left_eye_inner
+        left_eye_upper
+        left_eye_lower
+
+    Bocca
+        mouth_left
+        mouth_right
+        upper_lip_center
+        lower_lip_center
+        upper_lip_left
+        upper_lip_right
+
+    Sopracciglio destro
+        right_eyebrow_inner
+        right_eyebrow_outer
+
+    Sopracciglio sinistro
+        left_eyebrow_inner
+        left_eyebrow_outer
+
+Il filtro deve essere considerato uno strumento di verifica
+visiva e non una modifica del modello di mapping.
 
 ---
 
@@ -1575,22 +1660,32 @@ Le associazioni create nel Vertex Mapper devono essere
 mantenute anche quando l'operatore chiude e riapre
 la finestra di lavoro.
 
-La persistenza temporanea della sessione è già stata verificata.
+La persistenza temporanea della sessione è stata verificata.
 
-La persistenza definitiva su file deve invece essere
-considerata una funzionalità successiva.
+La persistenza definitiva su file del Canonical Mapping
+è stata implementata e verificata.
+
+Il mapping viene integrato nel Project e viene salvato
+nel project.json tramite la normale pipeline di persistenza
+del progetto.
+
+È stata inoltre verificata la ricostruzione del mapping
+alla riapertura del progetto.
 
 ---
 
 # 29. Salvataggio della Canonical Mapping
 
-La futura versione del sistema dovrà permettere di salvare
-le 25 associazioni in un formato persistente.
+Il sistema permette di salvare il Canonical Mapping
+all'interno della persistenza del progetto.
 
-Il formato definitivo deve essere progettato prima
-dell'implementazione.
+Il formato utilizzato è JSON, integrato nel file
+project.json del progetto.
 
-Il file dovrà contenere almeno:
+Il modello CanonicalMapping è indipendente dalla GUI
+e viene serializzato tramite ProjectSerializer.
+
+Il file contiene almeno:
 
 - identificativo del template;
 - versione del template;
@@ -2036,7 +2131,14 @@ Sono state verificate e consolidate le seguenti funzionalità:
 - sincronizzazione Mappa → ComboBox;
 - mantenimento della corretta posizione dei marker
   durante il ridimensionamento della finestra;
-- verifica della tolleranza di selezione sulla mappa.
+- verifica della tolleranza di selezione sulla mappa;
+- filtro di visualizzazione del mapping corrente;
+- visualizzazione di tutti i mapping associati;
+- filtri anatomici dei mapping;
+- verifica dei gruppi Volto, Naso, Occhio destro, Occhio sinistro,
+  Bocca, Sopracciglio destro e Sopracciglio sinistro;
+- verifica che i filtri modifichino esclusivamente la visualizzazione
+  senza modificare la VertexMappingCollection.
 
 ---
 
@@ -2163,6 +2265,11 @@ del modello e dei punti selezionati.
 Il Vertex Mapper è ora sufficientemente stabile
 per essere utilizzato come strumento di calibrazione
 manuale.
+
+La versione di riferimento consolidata è la 1.8.0.
+Oltre al workflow di associazione e alla mappa MediaPipe
+interattiva, il Vertex Mapper dispone ora di filtri anatomici
+per la revisione progressiva dei mapping.
 
 Il workflow completo è:
 
@@ -2298,9 +2405,22 @@ la relazione tra MediaPipe e Canonical Mesh.
 
 ---
 
+## Stato
+
+    COMPLETATO
+
+Il modello `CanonicalMapping` è stato implementato
+nel layer Models e integrato nel modello Project.
+
+Il modello è indipendente dalla GUI e rappresenta
+le associazioni tra i Control Points MediaPipe
+e i vertici della Canonical Mesh MakeHuman.
+
+---
+
 ## Nuova responsabilità
 
-Il modello dovrà rappresentare:
+Il modello rappresenta:
 
     Canonical Mapping
 
@@ -2311,18 +2431,16 @@ senza dipendere dalla GUI.
 ## Struttura concettuale
 
     CanonicalMapping
+        ├── mapping_version
+        ├── canonical_mesh_id
+        ├── canonical_mesh_version
         ├── template_id
         ├── template_version
-        ├── landmark mappings
-        └── metadata
+        └── control_points
 
-Ogni mapping:
-
-    LandmarkMapping
-        ├── landmark_index
-        ├── landmark_name
-        ├── vertex_index
-        └── vertex_position
+Ogni associazione contiene i dati necessari
+a identificare il Control Point e il vertice MakeHuman
+associato.
 
 ---
 
@@ -2330,12 +2448,15 @@ Ogni mapping:
 
 Il Mapping Model appartiene ai Models.
 
-Non deve appartenere a:
+Non appartiene a:
 
 - Dialog;
 - Widget;
 - Viewer;
 - Controller GUI.
+
+La GUI utilizza il modello tramite i livelli architetturali
+previsti dal progetto.
 
 ---
 
@@ -2347,9 +2468,22 @@ Salvare e ricaricare il Canonical Mapping.
 
 ---
 
-## Funzionalità
+## Stato
 
-Implementare:
+    COMPLETATO
+
+La persistenza del Canonical Mapping è stata implementata
+e verificata attraverso la persistenza standard del progetto.
+
+Il mapping viene salvato nel `project.json` e viene
+ricostruito automaticamente durante il caricamento
+del progetto.
+
+---
+
+## Funzionalità implementate
+
+Sono operative:
 
     Save Canonical Mapping
 
@@ -2357,11 +2491,43 @@ e:
 
     Load Canonical Mapping
 
+attraverso:
+
+    Project
+        ↓
+    ProjectSerializer
+        ↓
+    project.json
+
+e:
+
+    project.json
+        ↓
+    ProjectLoader
+        ↓
+    CanonicalMapping
+
+È inoltre operativo il comando:
+
+    File → Save
+
+tramite:
+
+    MainWindow
+        ↓
+    ApplicationController
+        ↓
+    ProjectController
+        ↓
+    ProjectManager
+        ↓
+    ProjectSaver
+
 ---
 
 ## Informazioni minime
 
-Il file deve contenere:
+Il file contiene:
 
 - identificativo template;
 - versione template;
@@ -3036,13 +3202,13 @@ Alla conclusione della presente revisione:
         COMPLETATO
 
     Sprint 19
-        PIANIFICATO
+        IN SVILUPPO
 
     Sprint 20
-        PIANIFICATO
+        COMPLETATO
 
     Sprint 21
-        PIANIFICATO
+        COMPLETATO
 
     Sprint 22
         PIANIFICATO
@@ -3096,7 +3262,9 @@ Il Vertex Mapper dispone ora di:
 - mappa MediaPipe interattiva;
 - selezione dei 25 Control Points;
 - sincronizzazione Mappa → ComboBox;
-- sincronizzazione ComboBox → Mappa.
+- sincronizzazione ComboBox → Mappa;
+- filtri di visualizzazione per gruppi anatomici;
+- visualizzazione selettiva dei mapping senza modifica del modello.
 
 Il progetto è quindi pronto per la fase successiva:
 
@@ -4348,12 +4516,16 @@ il Canonical Mapping.
 Il Vertex Mapper è stato completato e stabilizzato
 durante lo Sprint 18.
 
-Lo strumento è ora disponibile per la fase successiva
-di costruzione del Canonical Mapping.
+Il Canonical Mapping Model e la sua persistenza
+sono stati implementati e verificati durante
+gli Sprint 20 e 21.
 
 Il prossimo lavoro pratico consiste nel:
 
     COMPLETARE E VALIDARE I 25 CONTROL POINTS
+
+Il mapping persistente è ora disponibile come base
+dati per questa fase di validazione.
 
 secondo la relazione:
 
@@ -4433,10 +4605,13 @@ nelle fasi successive previste dalla roadmap.
         COMPLETATO
 
     25 ASSOCIAZIONI
-        DA COMPLETARE
+        DA COMPLETARE / VALIDARE
 
     CANONICAL MAPPING
-        DA IMPLEMENTARE
+        IMPLEMENTATO
+
+    PERSISTENZA CANONICAL MAPPING
+        IMPLEMENTATA E VERIFICATA
 
     REGISTRATION
         DA IMPLEMENTARE
@@ -4444,9 +4619,10 @@ nelle fasi successive previste dalla roadmap.
     PERSONALIZED MESH
         DA IMPLEMENTARE
 
-Solo dopo questa stabilizzazione
-si procederà alla persistenza definitiva
-del Canonical Mapping.
+La persistenza del Canonical Mapping è già operativa.
+Rimane da completare e validare il set definitivo
+delle 25 associazioni anatomiche prima di utilizzare
+il mapping nella registrazione geometrica.
 
 ---
 
@@ -5863,8 +6039,11 @@ di calibrazione manuale necessario alla costruzione
 del Canonical Mapping.
 
 La persistenza definitiva del Canonical Mapping
-su file e la sua validazione sono invece attività
-successive e sono descritte nelle sezioni dedicate.
+su file è stata implementata e verificata.
+
+La validazione anatomica e geometrica completa
+delle 25 associazioni rimane una attività da completare
+prima dell'utilizzo del mapping nel Registration Engine.
 
 ---
 
@@ -5883,16 +6062,18 @@ della Canonical Mesh può richiedere più sessioni.
 
 # 175. Salvataggio del Canonical Mapping
 
-Il mapping dovrà poter essere serializzato.
+Il mapping può essere serializzato attraverso
+la persistenza del progetto.
 
-Formato da valutare:
+Il formato utilizzato è:
 
     JSON
 
-oppure altro formato strutturato compatibile
-con l'architettura del progetto.
+integrato nel:
 
-Il file dovrà contenere almeno:
+    project.json
+
+Il file contiene almeno:
 
     landmark_index
     landmark_name
@@ -5909,19 +6090,29 @@ ed eventualmente:
 
 # 176. Caricamento del Canonical Mapping
 
-All'apertura del Vertex Mapper:
+All'apertura del progetto:
 
-    Mapping file
+    project.json
           ↓
-    VertexMappingCollection
+    ProjectLoader
+          ↓
+    CanonicalMapping
+          ↓
+    Project
+          ↓
+    Vertex Mapper
           ↓
     GUI
 
-Le associazioni precedenti dovranno essere
-ricaricate automaticamente quando disponibili.
+Le associazioni precedenti vengono ricaricate
+automaticamente quando disponibili.
 
-Il sistema non deve richiedere di ripetere
-associazioni già effettuate.
+Il sistema non richiede di ripetere associazioni
+già effettuate e salvate nel progetto.
+
+La persistenza è stata verificata con chiusura
+completa dell'applicazione e successiva riapertura
+del progetto.
 
 ---
 
@@ -7524,6 +7715,8 @@ In particolare:
     [x] verifica zoom / PAN
     [x] integrazione mappa MediaPipe
     [x] sincronizzazione Mappa ↔ ComboBox
+    [x] filtri di visualizzazione per gruppo anatomico
+    [x] verifica filtri senza modifica delle associazioni
 
 Rimane da completare:
 
@@ -7532,10 +7725,19 @@ Rimane da completare:
     [ ] verifica univocità delle associazioni
     [ ] validazione finale dei 25 mapping
 
+Completato:
+
+    [x] modello CanonicalMapping
+    [x] integrazione nel Project
+    [x] serializzazione del Canonical Mapping
+    [x] deserializzazione del Canonical Mapping
+    [x] salvataggio nel project.json
+    [x] caricamento alla riapertura del progetto
+    [x] verifica della persistenza dopo chiusura completa
+
 Successivamente:
 
-    [ ] persistenza definitiva del Canonical Mapping
-    [ ] validazione del Canonical Mapping
+    [ ] validazione completa del Canonical Mapping
     [ ] congelamento Canonical Mapping v1
 
 Solo dopo il completamento e la validazione

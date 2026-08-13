@@ -8,12 +8,20 @@ Autore:
 Marco Cantù
 
 Versione:
-3.2.6
+3.3.0
 ==========================================================
 """
 
 import numpy as np
 import pyqtgraph.opengl as gl
+from OpenGL.GL import (
+    GL_ALPHA_TEST,
+    GL_BLEND,
+    GL_CULL_FACE,
+    GL_DEPTH_TEST,
+    GL_ONE_MINUS_SRC_ALPHA,
+    GL_SRC_ALPHA,
+)
 from pyqtgraph.opengl import shaders as gl_shaders
 
 from PySide6.QtWidgets import (
@@ -193,7 +201,8 @@ class MeshViewer(QWidget):
     - visualizzazione point cloud;
     - visualizzazione wireframe;
     - gestione della camera;
-    - gestione della selezione di un vertice.
+    - gestione della selezione di un vertice;
+    - visualizzazione dei vertici associati ai landmark.
 
     Il MeshViewer non modifica la mesh originale.
     """
@@ -271,6 +280,8 @@ class MeshViewer(QWidget):
         # mappatura esistente e NON una selezione temporanea.
         #
         self._mapped_vertex_index = None
+        self._mapped_vertex_indices = []
+        self._mapped_vertex_item = None
 
         #
         # Stato del mouse.
@@ -735,7 +746,7 @@ class MeshViewer(QWidget):
         self._selected_vertex_item = (
             gl.GLScatterPlotItem(
                 pos=marker_position,
-                size=14,
+                size=16,
                 color=(
                     1.0,
                     0.0,
@@ -744,6 +755,23 @@ class MeshViewer(QWidget):
                 ),
                 pxMode=True,
             )
+        )
+
+        self._selected_vertex_item.setGLOptions(
+            {
+                GL_DEPTH_TEST: False,
+                GL_BLEND: True,
+                GL_ALPHA_TEST: False,
+                GL_CULL_FACE: False,
+                "glBlendFunc": (
+                    GL_SRC_ALPHA,
+                    GL_ONE_MINUS_SRC_ALPHA,
+                ),
+            }
+        )
+
+        self._selected_vertex_item.setDepthValue(
+            110
         )
 
         #
@@ -761,77 +789,105 @@ class MeshViewer(QWidget):
         vertex_index: int,
     ):
         """
-        Visualizza in AZZURRO un vertice già associato a un landmark.
+        Visualizza in AZZURRO un singolo vertice già associato.
 
-        Questa visualizzazione è distinta dalla selezione temporanea
-        utilizzata durante una nuova associazione.
-
-        Importante:
-        - non modifica _selected_vertex_index;
-        - non abilita il pulsante "Associa";
-        - serve esclusivamente per controllare/dissociare
-          una mappatura già esistente.
+        Questo metodo mantiene la compatibilità con il comportamento
+        precedente del MeshViewer. Internamente utilizza la nuova
+        gestione multipla dei vertici associati.
         """
 
-        #
-        # Nessuna mesh caricata.
-        #
+        self.show_mapped_vertices(
+            [vertex_index]
+        )
+
+    # ---------------------------------------------------------
+
+    def show_mapped_vertices(
+        self,
+        vertex_indices,
+    ):
+        """
+        Visualizza contemporaneamente più vertici associati.
+
+        Parameters
+        ----------
+        vertex_indices:
+            Iterable di indici di vertice della mesh.
+
+        Notes
+        -----
+        I marker associati sono indipendenti dalla selezione temporanea
+        del vertice corrente. È quindi possibile visualizzare tutti i
+        punti associati e, contemporaneamente, selezionare un nuovo
+        vertice con il marker rosso.
+        """
+
         if self._mesh is None:
+            self.clear_mapped_vertices()
             return
 
-        #
-        # Nessuna posizione disponibile.
-        #
         if self._vertex_positions is None:
+            self.clear_mapped_vertices()
             return
 
-        #
-        # Controllo indice.
-        #
-        if vertex_index < 0:
+        normalized_indices = []
+
+        if vertex_indices is None:
+            vertex_indices = []
+
+        for value in vertex_indices:
+
+            try:
+                vertex_index = int(value)
+            except (
+                TypeError,
+                ValueError,
+            ):
+                continue
+
+            if vertex_index < 0:
+                continue
+
+            if vertex_index >= len(
+                self._vertex_positions
+            ):
+                continue
+
+            if vertex_index not in normalized_indices:
+                normalized_indices.append(
+                    vertex_index
+                )
+
+        self.clear_mapped_vertices()
+
+        if not normalized_indices:
             return
 
-        if vertex_index >= len(
-            self._vertex_positions
-        ):
-            return
+        self._mapped_vertex_indices = (
+            normalized_indices
+        )
 
-        #
-        # Rimuove l'eventuale marker precedente.
-        #
-        self.clear_selected_vertex()
+        self._mapped_vertex_index = (
+            normalized_indices[0]
+        )
 
-        #
-        # Memorizza separatamente il vertice associato.
-        #
-        # Questo valore verrà utilizzato da show_mesh() per
-        # ricreare il marker dopo un cambio di modalità
-        # Points / Wire / Mesh.
-        #
-        self._mapped_vertex_index = vertex_index
-
-        #
-        # Recupera la posizione OpenGL.
-        #
-        position = self._vertex_positions[
-            vertex_index
-        ]
-
-        marker_position = np.array(
-            [position],
+        positions = np.array(
+            [
+                self._vertex_positions[
+                    vertex_index
+                ]
+                for vertex_index in normalized_indices
+            ],
             dtype=np.float32,
         )
 
-        #
-        # Marker AZZURRO.
-        #
-        self._selected_vertex_item = (
+        self._mapped_vertex_item = (
             gl.GLScatterPlotItem(
-                pos=marker_position,
-                size=14,
+                pos=positions,
+                size=18,
                 color=(
                     0.0,
-                    0.8,
+                    0.85,
                     1.0,
                     1.0,
                 ),
@@ -839,23 +895,56 @@ class MeshViewer(QWidget):
             )
         )
 
-        self._view.addItem(
-            self._selected_vertex_item
+        self._mapped_vertex_item.setGLOptions(
+            {
+                GL_DEPTH_TEST: False,
+                GL_BLEND: True,
+                GL_ALPHA_TEST: False,
+                GL_CULL_FACE: False,
+                "glBlendFunc": (
+                    GL_SRC_ALPHA,
+                    GL_ONE_MINUS_SRC_ALPHA,
+                ),
+            }
         )
 
-        #
-        # NON impostiamo _selected_vertex_index.
-        #
-        # Il punto azzurro è una visualizzazione di controllo
-        # di una mappatura esistente, non una nuova selezione
-        # temporanea destinata al pulsante "Associa".
-        #
+        self._mapped_vertex_item.setDepthValue(
+            100
+        )
+
+        self._view.addItem(
+            self._mapped_vertex_item
+        )
+
+    # ---------------------------------------------------------
+
+    def clear_mapped_vertices(self):
+        """
+        Rimuove tutti i marker dei vertici associati.
+
+        La mappatura nel modello non viene modificata.
+        Viene rimossa esclusivamente la visualizzazione.
+        """
+
+        if self._mapped_vertex_item is not None:
+
+            self._view.removeItem(
+                self._mapped_vertex_item
+            )
+
+            self._mapped_vertex_item = None
+
+        self._mapped_vertex_indices = []
+        self._mapped_vertex_index = None
 
     # ---------------------------------------------------------
 
     def clear_selected_vertex(self):
         """
-        Rimuove il marker del vertice selezionato.
+        Rimuove esclusivamente il marker del vertice
+        selezionato temporaneamente.
+
+        I marker dei vertici associati rimangono visibili.
         """
 
         if self._selected_vertex_item is not None:
@@ -867,7 +956,6 @@ class MeshViewer(QWidget):
             self._selected_vertex_item = None
 
         self._selected_vertex_index = None
-        self._mapped_vertex_index = None
 
     # ---------------------------------------------------------
 
@@ -882,6 +970,18 @@ class MeshViewer(QWidget):
         """
 
         return self._selected_vertex_index
+
+    # ---------------------------------------------------------
+
+    def mapped_vertex_indices(self):
+        """
+        Restituisce gli indici dei vertici associati
+        attualmente visualizzati.
+        """
+
+        return list(
+            self._mapped_vertex_indices
+        )
 
     # ---------------------------------------------------------
     # Utilities
@@ -930,6 +1030,12 @@ class MeshViewer(QWidget):
         #
 
         self.clear_selected_vertex()
+
+        #
+        # Mapped vertices
+        #
+
+        self.clear_mapped_vertices()
 
         #
         # Coordinate cache
@@ -1014,11 +1120,11 @@ class MeshViewer(QWidget):
         )
 
         #
-        # Memorizziamo anche l'eventuale vertice associato
-        # visualizzato in AZZURRO.
+        # Memorizziamo anche gli eventuali vertici associati
+        # visualizzati in AZZURRO.
         #
-        mapped_vertex_index = (
-            self._mapped_vertex_index
+        mapped_vertex_indices = list(
+            self._mapped_vertex_indices
         )
 
         #
@@ -1198,13 +1304,13 @@ class MeshViewer(QWidget):
         # modalità di rendering.
         #
 
-        if mapped_vertex_index is not None:
+        if mapped_vertex_indices:
 
-            self.select_mapped_vertex(
-                mapped_vertex_index
+            self.show_mapped_vertices(
+                mapped_vertex_indices
             )
 
-        elif selected_vertex_index is not None:
+        if selected_vertex_index is not None:
 
             self.select_vertex(
                 selected_vertex_index
