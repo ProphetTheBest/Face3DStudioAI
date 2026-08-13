@@ -66,6 +66,24 @@ class ProjectController:
 
     # ---------------------------------------------------------
 
+    def save_project(self) -> None:
+        """
+        Salva il progetto corrente.
+        """
+
+        project = self.get_project()
+
+        if project is None:
+            raise RuntimeError(
+                "Nessun progetto aperto."
+            )
+
+        self._project_manager.save_project(
+            project.project_folder
+        )
+
+    # ---------------------------------------------------------
+
     def get_project_name(self) -> str:
 
         project = self.get_project()

@@ -34,8 +34,8 @@ from source.dialogs.vertex_mapper_dialog import (
     VertexMapperDialog,
 )
 
-from source.models.mapping.vertex_mapping_collection import (
-    VertexMappingCollection,
+from source.models.mapping.canonical_mapping import (
+    CanonicalMapping,
 )
 from source.widgets.central_widget import CentralWidget
 from source.services.exporting.face_export_service import (
@@ -53,7 +53,6 @@ class MainWindow(QMainWindow):
 
         self.app_controller = app_controller
 
-        self._vertex_mapping_collection = VertexMappingCollection()
         self._vertex_mapper_dialog = None
 
         self._create_window()
@@ -138,6 +137,10 @@ class MainWindow(QMainWindow):
             self._on_vertex_mapper
         )
 
+        self.action_save_project.triggered.connect(
+            self._on_save_project
+        )
+
         self.action_exit.triggered.connect(
             self.close
         )
@@ -180,6 +183,34 @@ class MainWindow(QMainWindow):
     # Eventi
     # -----------------------------------------------------
 
+    def _on_save_project(self) -> None:
+        """
+        Gestisce il comando File -> Save.
+        """
+
+        project_controller = (
+            self.app_controller.get_project_controller()
+        )
+
+        try:
+            project_controller.save_project()
+
+            self.status_bar.showMessage(
+                "Project saved successfully.",
+                3000,
+            )
+
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                "Save Project",
+                str(e),
+            )
+
+            raise
+
+    # -----------------------------------------------------
+
     def _on_new_project(self) -> None:
         """
         Gestisce il comando File -> New Project.
@@ -203,6 +234,8 @@ class MainWindow(QMainWindow):
                 project_name,
                 project_folder,
             )
+
+            self._reset_vertex_mapper_dialog()
 
             self.central_widget.project_panel.refresh()
 
@@ -254,6 +287,8 @@ class MainWindow(QMainWindow):
             project_controller.open_project(
                 project_folder
             )
+
+            self._reset_vertex_mapper_dialog()
 
             self.central_widget.project_panel.refresh()
 
@@ -417,31 +452,106 @@ class MainWindow(QMainWindow):
 
     # -----------------------------------------------------
 
+    def _get_or_create_canonical_mapping(
+        self,
+    ) -> CanonicalMapping | None:
+        """
+        Restituisce il Canonical Mapping del progetto corrente.
+
+        Se il progetto non possiede ancora un mapping, lo crea
+        utilizzando l'identità della Canonical Mesh attualmente
+        utilizzata dal Vertex Mapper.
+
+        In questa fase il Vertex Mapper lavora sul template
+        MakeHuman male1591.
+        """
+
+        project_controller = (
+            self.app_controller.get_project_controller()
+        )
+
+        project = project_controller.get_project()
+
+        if project is None:
+            return None
+
+        if project.has_canonical_mapping():
+            return project.canonical_mapping
+
+        canonical_mapping = CanonicalMapping(
+            mapping_version="1.0",
+            canonical_mesh_id="makehuman_male1591_head",
+            canonical_mesh_version="1.0",
+            template_id="male1591",
+            template_version="1.0",
+        )
+
+        project.set_canonical_mapping(
+            canonical_mapping
+        )
+
+        return canonical_mapping
+
+    # -----------------------------------------------------
+
+    def _reset_vertex_mapper_dialog(
+        self,
+    ) -> None:
+        """
+        Chiude e rimuove l'istanza corrente del Vertex Mapper.
+
+        Viene utilizzato quando cambia il progetto, in modo
+        da evitare che il dialog continui a utilizzare il
+        Canonical Mapping del progetto precedente.
+        """
+
+        if self._vertex_mapper_dialog is not None:
+
+            self._vertex_mapper_dialog.close()
+
+            self._vertex_mapper_dialog = None
+
+    # -----------------------------------------------------
+
     def _on_vertex_mapper(self) -> None:
         """
-        Apre il Vertex Mapper.
+        Apre il Vertex Mapper utilizzando il Canonical Mapping
+        appartenente al progetto corrente.
 
-        Il dialog viene creato una sola volta durante la vita
-        della MainWindow. La chiusura lo nasconde, ma non
-        distrugge il GLViewWidget e quindi non forza la
-        ricreazione del contesto OpenGL.
+        Se il progetto non possiede ancora un Canonical Mapping,
+        questo viene creato al primo accesso al Vertex Mapper.
 
-        Alla riapertura viene riutilizzata la stessa viewport.
+        Il dialog viene riutilizzato finché rimane aperto lo
+        stesso progetto.
         """
+
+        canonical_mapping = (
+            self._get_or_create_canonical_mapping()
+        )
+
+        if canonical_mapping is None:
+
+            QMessageBox.warning(
+                self,
+                "Vertex Mapper",
+                "Create or open a project before opening "
+                "the Vertex Mapper.",
+            )
+
+            return
 
         if self._vertex_mapper_dialog is None:
 
             self._vertex_mapper_dialog = (
                 VertexMapperDialog(
-                    mapping_collection=(
-                        self._vertex_mapping_collection
-                    ),
+                    mapping_collection=canonical_mapping,
                     parent=self,
                 )
             )
 
         #
-        # Riutilizziamo sempre la stessa istanza.
+        # Riutilizziamo sempre la stessa istanza finché
+        # il progetto corrente non cambia.
         #
 
         self._vertex_mapper_dialog.show()
