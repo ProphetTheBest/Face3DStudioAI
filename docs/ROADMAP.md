@@ -11,14 +11,14 @@ Technical Lead AI:
 ChatGPT
 
 Versione documento:
-2.2
+2.3
 
 Ultimo aggiornamento:
-13/08/2026
+17/08/2026
 
 Stato:
-Roadmap riallineato alla reale architettura del progetto e alla nuova
-strategia Canonical Mesh / MediaPipe / MakeHuman.
+Roadmap riallineato alla reale architettura del progetto e allo stato
+verificato del Canonical Mapping / Canonical Mesh / MediaPipe / MakeHuman.
 
 ---
 
@@ -3193,7 +3193,7 @@ nel ROADMAP storico. :contentReference[oaicite:1]{index=1}
 
 # 62. Stato della roadmap
 
-Alla conclusione della presente revisione:
+Alla data del 17/08/2026:
 
     Sprint 17.1
         COMPLETATO
@@ -3202,7 +3202,7 @@ Alla conclusione della presente revisione:
         COMPLETATO
 
     Sprint 19
-        IN SVILUPPO
+        COMPLETATO
 
     Sprint 20
         COMPLETATO
@@ -3247,30 +3247,17 @@ Lo Sprint 18 ha portato il Vertex Mapper
 a uno stato stabile e utilizzabile come
 strumento di calibrazione manuale.
 
-Il Vertex Mapper dispone ora di:
+Lo Sprint 19 ha completato e validato
+le 25 associazioni MediaPipe ↔ MakeHuman.
 
-- associazione;
-- dissociazione;
-- verifica dei mapping esistenti;
-- gestione dei marker;
-- gestione della camera;
-- zoom;
-- PAN;
-- rotazione;
-- modalità Mesh, Wireframe e Point;
-- mantenimento delle associazioni dopo la riapertura;
-- mappa MediaPipe interattiva;
-- selezione dei 25 Control Points;
-- sincronizzazione Mappa → ComboBox;
-- sincronizzazione ComboBox → Mappa;
-- filtri di visualizzazione per gruppi anatomici;
-- visualizzazione selettiva dei mapping senza modifica del modello.
+Sono state inoltre eseguite verifiche
+geometriche e topologiche sul template
+male1591/head utilizzato come base
+della Canonical Mesh.
 
-Il progetto è quindi pronto per la fase successiva:
-
-    Sprint 19
-        completamento e validazione
-        delle 25 associazioni MediaPipe ↔ MakeHuman.
+Il progetto è quindi pronto per la fase
+successiva di costruzione e validazione
+della Canonical Mesh.
 
 ---
 
@@ -4511,7 +4498,7 @@ il Canonical Mapping.
 
 ---
 
-# 114. Prossimo obiettivo operativo
+# 114. Stato operativo dopo la validazione dei 25 Control Points
 
 Il Vertex Mapper è stato completato e stabilizzato
 durante lo Sprint 18.
@@ -4520,14 +4507,10 @@ Il Canonical Mapping Model e la sua persistenza
 sono stati implementati e verificati durante
 gli Sprint 20 e 21.
 
-Il prossimo lavoro pratico consiste nel:
+Lo Sprint 19 è stato completato con la costruzione
+e la validazione del set definitivo dei 25 Control Points.
 
-    COMPLETARE E VALIDARE I 25 CONTROL POINTS
-
-Il mapping persistente è ora disponibile come base
-dati per questa fase di validazione.
-
-secondo la relazione:
+La relazione risultante è:
 
     MediaPipe Control Point
             ↕
@@ -4535,67 +4518,116 @@ secondo la relazione:
 
 ---
 
-## Obiettivo dello Sprint 19
+## Risultato dello Sprint 19
 
-Per ciascuno dei 25 Control Points dovrà essere
-individuato e associato il corrispondente vertice
-della mesh MakeHuman utilizzata come Canonical Mesh.
-
-Il lavoro comprenderà:
-
-- selezione del Control Point;
-- verifica anatomica tramite la mappa MediaPipe;
-- selezione del vertice MakeHuman;
-- verifica visiva sulla mesh;
-- associazione;
-- eventuale dissociazione e correzione;
-- verifica dell'univocità delle associazioni;
-- verifica della correttezza anatomica;
-- verifica della coerenza geometrica complessiva.
-
----
-
-## Risultato atteso
-
-Al termine della fase dovranno essere disponibili:
+Sono presenti:
 
     25 Control Points
             ↕
-    25 associazioni validate
+    25 associazioni
             ↕
-    25 vertici MakeHuman
+    25 vertici MakeHuman univoci
 
-Le associazioni dovranno costituire una base
-affidabile per la successiva costruzione
-del Canonical Mapping.
+Il mapping risulta:
+
+    Mapping: 25/25
+    Mapping status: COMPLETE
+
+La corrispondenza è stata verificata anche
+rispetto alla convenzione anatomica destra/sinistra.
+I nomi `right_*` e `left_*` rappresentano il lato
+anatomico del modello e non la posizione grafica
+sullo schermo.
 
 ---
 
-## Fase successiva
+## Validazione geometrica eseguita
 
-Dopo la validazione delle 25 associazioni
-si procederà con:
+Il template:
 
-    Canonical Mapping Model
-            ↓
-    persistenza del mapping
-            ↓
-    validazione
-            ↓
-    Canonical Mesh Builder
-            ↓
-    Registration Engine
+    male1591
+    part = head
 
-Non implementare ancora:
+è stato verificato con:
 
-- registrazione automatica;
-- deformazione;
-- ricostruzione completa;
-- texture projection;
-- ricostruzione da fotografia.
+    1604 vertici
+    3064 triangoli
 
-Queste funzionalità saranno affrontate
-nelle fasi successive previste dalla roadmap.
+Controlli eseguiti:
+
+    coordinate finite:
+        NaN = 0
+        Inf = 0
+
+    indici triangolari:
+        non validi = 0
+
+    triangoli degenerati:
+        0
+
+    vertici duplicati:
+        0
+
+    componenti connesse:
+        6
+
+Dimensioni delle componenti:
+
+    Componente 1: 490 vertici
+    Componente 2: 276 vertici
+    Componente 3: 276 vertici
+    Componente 4: 256 vertici
+    Componente 5: 256 vertici
+    Componente 6: 50 vertici
+
+La componente principale contiene 21 Control Points.
+Le restanti componenti interessate dai Control Points
+sono le componenti associate alle geometrie degli occhi.
+
+---
+
+## Bounding Box della componente principale
+
+    X: -0.081100 → 0.081100
+    Y:  1.387100 → 1.659500
+    Z: -0.048500 → 0.159300
+
+Dimensioni:
+
+    X = 0.162200
+    Y = 0.272400
+    Z = 0.207800
+
+Centro:
+
+    (0.000000, 1.523300, 0.055400)
+
+---
+
+## Control Points normalizzati
+
+È stata verificata la normalizzazione dei 25 Control Points
+rispetto al bounding box della componente principale.
+
+Sono state inoltre verificate le coppie bilaterali:
+
+    right_eye_outer       ↔ left_eye_outer
+    right_eye_inner       ↔ left_eye_inner
+    right_eyebrow_inner   ↔ left_eyebrow_inner
+    right_eyebrow_outer   ↔ left_eyebrow_outer
+    mouth_right           ↔ mouth_left
+    upper_lip_right       ↔ upper_lip_left
+    nose_right_base       ↔ nose_left_base
+
+Tutte le coppie risultano coerenti entro la tolleranza
+utilizzata, ad eccezione di `eye_outer`, che presenta
+un piccolo errore normalizzato:
+
+    errore = 0.0117
+
+Questo valore non è stato considerato sufficiente
+per invalidare il mapping e viene mantenuto come
+caratteristica geometrica locale da monitorare.
 
 ---
 
@@ -4604,14 +4636,20 @@ nelle fasi successive previste dalla roadmap.
     VERTEX MAPPER
         COMPLETATO
 
-    25 ASSOCIAZIONI
-        DA COMPLETARE / VALIDARE
+    25 CONTROL POINTS
+        COMPLETATI E VALIDATI
 
     CANONICAL MAPPING
         IMPLEMENTATO
 
+    CANONICAL MAPPING
+        25/25 - COMPLETE
+
     PERSISTENZA CANONICAL MAPPING
         IMPLEMENTATA E VERIFICATA
+
+    TEMPLATE GEOMETRY VALIDATION
+        COMPLETATA
 
     REGISTRATION
         DA IMPLEMENTARE
@@ -4619,10 +4657,34 @@ nelle fasi successive previste dalla roadmap.
     PERSONALIZED MESH
         DA IMPLEMENTARE
 
-La persistenza del Canonical Mapping è già operativa.
-Rimane da completare e validare il set definitivo
-delle 25 associazioni anatomiche prima di utilizzare
-il mapping nella registrazione geometrica.
+---
+
+## Prossima fase
+
+Il prossimo obiettivo operativo è la costruzione
+della Canonical Mesh a partire dal template MakeHuman,
+mantenendo:
+
+    - identità dei vertici;
+    - triangolazione;
+    - coordinate originali;
+    - topologia;
+    - compatibilità con il Canonical Mapping.
+
+Successivamente dovrà essere eseguita la validazione
+geometrica della Canonical Mesh come asset versionato.
+
+Non implementare ancora:
+
+- Registration Engine;
+- Global Alignment;
+- Local Deformation;
+- ricostruzione completa;
+- texture projection;
+- ricostruzione da fotografia.
+
+Queste funzionalità saranno affrontate negli Sprint
+successivi secondo la sequenza prevista dalla roadmap.
 
 ---
 
@@ -7693,54 +7755,129 @@ al termine di ogni milestone significativa.
 
 # 253. PROSSIMO STEP OPERATIVO
 
-Lo Sprint 18 ha completato e stabilizzato
-il Vertex Mapper.
+Lo Sprint 19 è stato completato.
 
-Prima di iniziare la fase
-di Registration Engine è necessario
-completare e validare le 25 associazioni
-tra i Control Points MediaPipe
-e i vertici della Canonical Mesh MakeHuman.
+Il Canonical Mapping definitivo contiene:
 
-In particolare:
+    25 / 25 Control Points
+    status = COMPLETE
 
-    [x] verifica finale UI
-    [x] verifica associazione
-    [x] verifica dissociazione
-    [x] verifica evidenziazione
-    [x] verifica report
-    [x] verifica riapertura finestra
-    [x] verifica OpenGL
-    [x] verifica Mesh / Wireframe / Point
-    [x] verifica zoom / PAN
-    [x] integrazione mappa MediaPipe
-    [x] sincronizzazione Mappa ↔ ComboBox
-    [x] filtri di visualizzazione per gruppo anatomico
-    [x] verifica filtri senza modifica delle associazioni
+Sono state inoltre completate le verifiche
+geometriche e topologiche preliminari sul template
+`male1591/head`.
 
-Rimane da completare:
+In particolare sono stati verificati:
 
-    [ ] associazione dei 25 Control Points
-    [ ] verifica anatomica delle associazioni
-    [ ] verifica univocità delle associazioni
-    [ ] validazione finale dei 25 mapping
+    [x] 1604 vertici
+    [x] 3064 triangoli
+    [x] coordinate senza NaN
+    [x] coordinate senza Inf
+    [x] indici triangolari validi
+    [x] triangoli non degenerati
+    [x] assenza di vertici duplicati
+    [x] 6 componenti connesse identificate
+    [x] bounding box della componente principale
+    [x] distribuzione dei Control Points
+    [x] coordinate normalizzate
+    [x] verifica della simmetria bilaterale
 
-Completato:
+La verifica della simmetria ha evidenziato una sola
+piccola asimmetria locale:
 
-    [x] modello CanonicalMapping
-    [x] integrazione nel Project
-    [x] serializzazione del Canonical Mapping
-    [x] deserializzazione del Canonical Mapping
-    [x] salvataggio nel project.json
-    [x] caricamento alla riapertura del progetto
-    [x] verifica della persistenza dopo chiusura completa
+    right_eye_outer ↔ left_eye_outer
+    errore normalizzato = 0.0117
 
-Successivamente:
+Il valore è stato registrato come caratteristica
+da monitorare e non come errore invalidante.
 
-    [ ] validazione completa del Canonical Mapping
-    [ ] congelamento Canonical Mapping v1
+---
 
-Solo dopo il completamento e la validazione
-del Canonical Mapping sarà possibile iniziare:
+## Mapping definitivo
 
-    Global Registration Engine.
+Le 25 associazioni definitive sono:
+
+    1    nose_bridge           → vertex 216
+    2    nose_lower_center    → vertex 531
+    4    nose_tip             → vertex 537
+    10   forehead_center      → vertex 534
+    13   upper_lip_center     → vertex 536
+    14   lower_lip_center     → vertex 259
+    33   right_eye_outer      → vertex 211
+    46   right_eyebrow_inner  → vertex 85
+    55   right_eyebrow_outer  → vertex 82
+    61   mouth_right          → vertex 62
+    78   upper_lip_right      → vertex 55
+    98   nose_right_base      → vertex 92
+    133  right_eye_inner      → vertex 26
+    145  right_eye_lower      → vertex 1323
+    152  chin                 → vertex 487
+    159  right_eye_upper      → vertex 1379
+    263  left_eye_outer       → vertex 303
+    276  left_eyebrow_inner   → vertex 357
+    285  left_eyebrow_outer   → vertex 354
+    291  mouth_left            → vertex 333
+    308  upper_lip_left       → vertex 326
+    327  nose_left_base       → vertex 364
+    362  left_eye_inner       → vertex 298
+    374  left_eye_lower       → vertex 791
+    386  left_eye_upper       → vertex 590
+
+La convenzione `right_*` / `left_*` è anatomica:
+non deve essere reinterpretata in base alla posizione
+del punto sulla bitmap visualizzata.
+
+---
+
+## Stato corrente
+
+    [x] Vertex Mapper
+    [x] Mappa MediaPipe interattiva
+    [x] Filtri anatomici
+    [x] CanonicalMapping Model
+    [x] Mapping persistence
+    [x] 25 Control Points associati
+    [x] Mapping 25/25 COMPLETE
+    [x] Validazione strutturale del mapping
+    [x] Validazione geometrica preliminare del template
+    [x] Normalizzazione dei Control Points
+    [x] Verifica di simmetria bilaterale
+
+---
+
+## Prossimo lavoro
+
+Il prossimo obiettivo è:
+
+    Sprint 22 — Canonical Mesh Builder
+
+Prima di modificare il codice:
+
+    1. verificare la struttura reale del progetto;
+    2. verificare se esiste già una responsabilità equivalente;
+    3. non duplicare classi o servizi;
+    4. definire il minimo modello geometrico necessario;
+    5. implementare una sola modifica;
+    6. eseguire il test;
+    7. verificare le regressioni;
+    8. aggiornare la documentazione;
+    9. eseguire il commit.
+
+Il Canonical Mesh Builder dovrà produrre una rappresentazione
+derivata e identificabile del template MakeHuman senza
+modificare il template sorgente.
+
+La fase di Registration Engine rimane successiva
+e non deve essere anticipata.
+
+---
+
+## Regola per la nuova sessione
+
+La nuova sessione di sviluppo deve ripartire
+dal presente checkpoint.
+
+Non ripetere il lavoro già completato
+a meno che un test non dimostri una regressione.
+
+Il prossimo step operativo deve essere esplicitato
+prima di modificare qualsiasi file.

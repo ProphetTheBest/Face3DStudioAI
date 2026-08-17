@@ -175,3 +175,169 @@ Versione: VertexMapperDialog 1.8.0
 
 Il Vertex Mapper è ora pronto per la prosecuzione dello Sprint 19,
 con il completamento progressivo delle 25 associazioni MediaPipe ↔ MakeHuman.
+
+---
+
+## Sprint 19 — Canonical Mapping Validation
+
+Data: 17/08/2026
+
+### Stato
+
+[x] Sprint 19 completato e verificato.
+
+### Canonical Mapping
+
+Il set definitivo dei Control Points MediaPipe è stato
+completato.
+
+Risultato:
+
+    Mapping: 25/25
+    Mapping status: COMPLETE
+
+Sono state verificate l'univocità dei landmark e dei
+vertici associati e la coerenza della convenzione
+anatomica destra/sinistra.
+
+La convenzione utilizzata è anatomica:
+
+    right_* = lato destro anatomico del modello
+    left_*  = lato sinistro anatomico del modello
+
+La posizione del punto sulla bitmap visualizzata non
+deve essere utilizzata per reinterpretare il lato anatomico.
+
+### Mapping definitivo
+
+- nose_bridge → vertex 216
+- nose_lower_center → vertex 531
+- nose_tip → vertex 537
+- forehead_center → vertex 534
+- upper_lip_center → vertex 536
+- lower_lip_center → vertex 259
+- right_eye_outer → vertex 211
+- right_eyebrow_inner → vertex 85
+- right_eyebrow_outer → vertex 82
+- mouth_right → vertex 62
+- upper_lip_right → vertex 55
+- nose_right_base → vertex 92
+- right_eye_inner → vertex 26
+- right_eye_lower → vertex 1323
+- chin → vertex 487
+- right_eye_upper → vertex 1379
+- left_eye_outer → vertex 303
+- left_eyebrow_inner → vertex 357
+- left_eyebrow_outer → vertex 354
+- mouth_left → vertex 333
+- upper_lip_left → vertex 326
+- nose_left_base → vertex 364
+- left_eye_inner → vertex 298
+- left_eye_lower → vertex 791
+- left_eye_upper → vertex 590
+
+### Validazione del template MakeHuman
+
+Template:
+
+    male1591
+    part = head
+
+Verifiche eseguite:
+
+- 1604 vertici;
+- 3064 triangoli;
+- nessun indice triangolare non valido;
+- nessun triangolo degenerato;
+- nessun vertice duplicato;
+- 4812 coordinate finite;
+- NaN = 0;
+- Inf = 0.
+
+### Componenti connesse
+
+La mesh presenta 6 componenti connesse:
+
+- Componente 1: 490 vertici
+- Componente 2: 276 vertici
+- Componente 3: 276 vertici
+- Componente 4: 256 vertici
+- Componente 5: 256 vertici
+- Componente 6: 50 vertici
+
+La componente principale contiene 21 Control Points.
+Le componenti relative alle geometrie degli occhi
+contengono i restanti Control Points oculari.
+
+### Bounding Box componente principale
+
+    X: -0.081100 → 0.081100
+    Y:  1.387100 → 1.659500
+    Z: -0.048500 → 0.159300
+
+    sizeX = 0.162200
+    sizeY = 0.272400
+    sizeZ = 0.207800
+
+    center = (0.000000, 1.523300, 0.055400)
+
+### Coordinate normalizzate
+
+È stata verificata la normalizzazione dei Control Points
+rispetto al bounding box della componente principale.
+
+Sono state verificate le coppie bilaterali:
+
+- right_eye_outer ↔ left_eye_outer
+- right_eye_inner ↔ left_eye_inner
+- right_eyebrow_inner ↔ left_eyebrow_inner
+- right_eyebrow_outer ↔ left_eyebrow_outer
+- mouth_right ↔ mouth_left
+- upper_lip_right ↔ upper_lip_left
+- nose_right_base ↔ nose_left_base
+
+Tutte le coppie risultano coerenti entro la tolleranza
+utilizzata, con una sola piccola asimmetria locale:
+
+    right_eye_outer ↔ left_eye_outer
+    errore normalizzato = 0.0117
+
+Il valore non è stato considerato sufficiente per invalidare
+il mapping. Viene registrato come caratteristica geometrica
+locale da monitorare.
+
+### Test superati
+
+- Catalogo Control Points: OK
+- Convenzione anatomica dei lati: OK
+- Associazione dei 25 Control Points: OK
+- Mapping 25/25: OK
+- Stato COMPLETE: OK
+- Validazione coordinate: OK
+- Validazione triangoli: OK
+- Triangoli degenerati: 0
+- Vertici duplicati: 0
+- Componenti connesse: verificata
+- Bounding box: verificata
+- Normalizzazione Control Points: OK
+- Simmetria bilaterale: OK con l'asimmetria locale documentata
+
+### Risultato
+
+Il Canonical Mapping è ora considerato il set definitivo
+di 25 associazioni per il template `male1591/head`.
+
+La fase di associazione manuale è conclusa.
+
+### Prossimo obiettivo
+
+Il prossimo lavoro sarà la costruzione della Canonical Mesh
+derivata dal template MakeHuman, mantenendo:
+
+- identità dei vertici;
+- triangolazione;
+- topologia;
+- coordinate;
+- compatibilità con il Canonical Mapping.
+
+La Registration Engine non viene ancora implementata.

@@ -86,17 +86,17 @@ def create_standard_landmarks() -> list[LandmarkDefinition]:
 
         LandmarkDefinition(
             index=98,
-            name="nose_left_base",
+            name="nose_right_base",
             description=(
-                "Zona laterale sinistra della base del naso."
+                "Zona laterale destra della base del naso."
             ),
         ),
 
         LandmarkDefinition(
             index=327,
-            name="nose_right_base",
+            name="nose_left_base",
             description=(
-                "Zona laterale destra della base del naso."
+                "Zona laterale sinistra della base del naso."
             ),
         ),
 
@@ -181,17 +181,17 @@ def create_standard_landmarks() -> list[LandmarkDefinition]:
 
         LandmarkDefinition(
             index=61,
-            name="mouth_left",
+            name="mouth_right",
             description=(
-                "Angolo sinistro della bocca."
+                "Angolo destro della bocca."
             ),
         ),
 
         LandmarkDefinition(
             index=291,
-            name="mouth_right",
+            name="mouth_left",
             description=(
-                "Angolo destro della bocca."
+                "Angolo sinistro della bocca."
             ),
         ),
 
@@ -213,17 +213,17 @@ def create_standard_landmarks() -> list[LandmarkDefinition]:
 
         LandmarkDefinition(
             index=78,
-            name="upper_lip_left",
+            name="upper_lip_right",
             description=(
-                "Zona sinistra del labbro superiore."
+                "Zona destra del labbro superiore."
             ),
         ),
 
         LandmarkDefinition(
             index=308,
-            name="upper_lip_right",
+            name="upper_lip_left",
             description=(
-                "Zona destra del labbro superiore."
+                "Zona sinistra del labbro superiore."
             ),
         ),
 
