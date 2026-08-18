@@ -475,11 +475,119 @@ Risultato:
     Canonical Mapping: OK
 
     FINAL RESULT: SPRINT 22 OK
+---
+
+## Sprint 23 — Canonical Mesh Validation
+
+Data: 18/08/2026
+
+### Stato
+
+[x] Prima fase dello Sprint 23 completata e verificata.
+
+Lo Sprint 23 rimane IN CORSO fino al completamento dei controlli
+su normali, orientamento delle facce, scala, distribuzione dei
+Control Points e visualizzazione dedicata.
+
+### Validazione implementata
+
+È stato implementato e integrato il `CanonicalMeshValidator`
+con il relativo `CanonicalMeshValidationReport`.
+
+La validazione attuale verifica:
+
+- numero di vertici;
+- numero di triangoli;
+- validità degli indici triangolari;
+- coordinate finite;
+- rilevamento di NaN;
+- rilevamento di Inf;
+- bounding box;
+- dimensioni;
+- centro geometrico;
+- boundary edges;
+- boundary vertices;
+- edge non-manifold;
+- triangoli degeneri per indici duplicati;
+- triangoli degeneri per area geometrica nulla;
+- serializzazione del report.
+
+### Risultato sulla Canonical Mesh reale
+
+Template:
+
+    male1591/head
+
+Source:
+
+    male1591_head.obj
+
+Risultati:
+
+    Vertices:              1604
+    Triangles:             3064
+    Boundary edges:         138
+    Boundary vertices:      138
+    Non-manifold edges:       0
+    Degenerate triangles:     0
+    Non-finite vertices:      0
+    Bounds:                   disponibili
+    Validation:               True
+
+Il boundary viene registrato come warning diagnostico e non
+come errore bloccante. Gli edge non-manifold e i triangoli
+degeneri vengono invece trattati come errori.
+
+### Test negativi
+
+Sono stati verificati con successo:
+
+- vertice contenente NaN;
+- vertici contenenti Inf e -Inf;
+- triangolo con indice duplicato;
+- triangolo con tre indici distinti ma area nulla;
+- edge non-manifold.
+
+È stata inoltre verificata l'indipendenza delle diagnostiche,
+evitatando che un triangolo degenere generi artificialmente
+errori non-manifold secondari.
+
+### Test integrato
+
+Il test finale della fase implementata ha prodotto:
+
+    Template vertices: 1604
+    Template triangles: 3064
+    Canonical vertices: 1604
+    Canonical triangles: 3064
+    Validation valid: True
+    Boundary edges: 138
+    Boundary vertices: 138
+    Non-manifold edges: 0
+    Degenerate triangles: 0
+    Non-finite vertices: 0
+    Bounds available: True
+    Warnings: 1
+    Errors: 0
+
+    RESULT: SPRINT 23 INTEGRATION OK
+
+### Implementazione non ancora completata
+
+Restano da implementare e verificare:
+
+- normali delle facce;
+- orientamento / winding;
+- scala e sistema di coordinate;
+- distribuzione dei 25 Control Points;
+- visualizzazione Canonical Mesh + 25 Control Points;
+- test finale completo dello Sprint 23.
 
 ### Prossimo obiettivo
 
-Il prossimo lavoro è lo:
+Il prossimo lavoro rimane all'interno dello Sprint 23.
 
-    Sprint 23 — Canonical Mesh Validation
+Il primo controllo successivo sarà la validazione delle normali
+e dell'orientamento delle facce.
 
 La Registration Engine non viene ancora implementata.

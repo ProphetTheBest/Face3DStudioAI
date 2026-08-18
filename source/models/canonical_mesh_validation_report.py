@@ -3,8 +3,10 @@
 Face3D Studio AI
 
 Canonical Mesh Validation Report
+==========================================================
 
 Responsabilità:
+
 - rappresentare il risultato della validazione
   della Canonical Mesh;
 - contenere le statistiche geometriche;
@@ -15,11 +17,14 @@ Responsabilità:
   non-manifold;
 - contenere le informazioni relative ai triangoli
   degeneri;
+- contenere le informazioni relative alle normali
+  delle facce;
 - contenere le informazioni relative ai Control Points;
 - contenere le informazioni relative a coordinate
   non finite.
 
 Il modello non contiene:
+
 - algoritmi di validazione;
 - codice GUI;
 - codice OpenGL;
@@ -36,7 +41,7 @@ Autore:
 Marco Cantù
 
 Versione:
-1.2.0
+1.3.0
 ==========================================================
 """
 
@@ -143,6 +148,51 @@ class CanonicalMeshValidationReport:
     )
 
     #
+    # Numero totale di normali delle facce
+    # analizzate.
+    #
+    normal_count: int = 0
+
+    #
+    # Numero di normali valide.
+    #
+    valid_normal_count: int = 0
+
+    #
+    # Numero di normali con lunghezza nulla.
+    #
+    zero_length_normal_count: int = 0
+
+    #
+    # Numero di normali non finite.
+    #
+    non_finite_normal_count: int = 0
+
+    #
+    # Indici dei triangoli con normale nulla.
+    #
+    zero_length_normal_indices: list[int] = field(
+        default_factory=list
+    )
+
+    #
+    # Indici dei triangoli con normale non finita.
+    #
+    non_finite_normal_indices: list[int] = field(
+        default_factory=list
+    )
+
+    #
+    # Lunghezza minima delle normali valide.
+    #
+    min_normal_length: float | None = None
+
+    #
+    # Lunghezza massima delle normali valide.
+    #
+    max_normal_length: float | None = None
+
+    #
     # Bounding box della Canonical Mesh.
     #
     bounds: MeshBounds | None = None
@@ -183,7 +233,10 @@ class CanonicalMeshValidationReport:
         il report non valido.
         """
 
-        self.errors.append(message)
+        self.errors.append(
+            message
+        )
+
         self.is_valid = False
 
     def add_warning(
@@ -197,7 +250,9 @@ class CanonicalMeshValidationReport:
         invalida la Canonical Mesh.
         """
 
-        self.warnings.append(message)
+        self.warnings.append(
+            message
+        )
 
     def finalize(self) -> None:
         """
@@ -215,7 +270,9 @@ class CanonicalMeshValidationReport:
         almeno un errore.
         """
 
-        return bool(self.errors)
+        return bool(
+            self.errors
+        )
 
     def has_warnings(self) -> bool:
         """
@@ -223,7 +280,9 @@ class CanonicalMeshValidationReport:
         almeno un warning.
         """
 
-        return bool(self.warnings)
+        return bool(
+            self.warnings
+        )
 
     def to_dict(self) -> dict:
         """
@@ -237,6 +296,7 @@ class CanonicalMeshValidationReport:
         bounds_data = None
 
         if self.bounds is not None:
+
             bounds_data = {
                 "min_x": self.bounds.min_x,
                 "max_x": self.bounds.max_x,
@@ -256,48 +316,116 @@ class CanonicalMeshValidationReport:
 
         return {
             "is_valid": self.is_valid,
+
             "vertex_count": self.vertex_count,
+
             "triangle_count": self.triangle_count,
+
             "invalid_triangle_count": (
                 self.invalid_triangle_count
             ),
+
             "invalid_triangle_indices": (
-                list(self.invalid_triangle_indices)
+                list(
+                    self.invalid_triangle_indices
+                )
             ),
+
             "non_finite_vertex_count": (
                 self.non_finite_vertex_count
             ),
+
             "non_finite_vertex_indices": (
-                list(self.non_finite_vertex_indices)
+                list(
+                    self.non_finite_vertex_indices
+                )
             ),
+
             "boundary_edge_count": (
                 self.boundary_edge_count
             ),
+
             "boundary_vertex_count": (
                 self.boundary_vertex_count
             ),
+
             "boundary_vertex_indices": (
-                list(self.boundary_vertex_indices)
+                list(
+                    self.boundary_vertex_indices
+                )
             ),
+
             "non_manifold_edge_count": (
                 self.non_manifold_edge_count
             ),
+
             "non_manifold_edge_indices": (
-                list(self.non_manifold_edge_indices)
+                list(
+                    self.non_manifold_edge_indices
+                )
             ),
+
             "degenerate_triangle_count": (
                 self.degenerate_triangle_count
             ),
+
             "degenerate_triangle_indices": (
-                list(self.degenerate_triangle_indices)
+                list(
+                    self.degenerate_triangle_indices
+                )
             ),
+
+            "normal_count": (
+                self.normal_count
+            ),
+
+            "valid_normal_count": (
+                self.valid_normal_count
+            ),
+
+            "zero_length_normal_count": (
+                self.zero_length_normal_count
+            ),
+
+            "non_finite_normal_count": (
+                self.non_finite_normal_count
+            ),
+
+            "zero_length_normal_indices": (
+                list(
+                    self.zero_length_normal_indices
+                )
+            ),
+
+            "non_finite_normal_indices": (
+                list(
+                    self.non_finite_normal_indices
+                )
+            ),
+
+            "min_normal_length": (
+                self.min_normal_length
+            ),
+
+            "max_normal_length": (
+                self.max_normal_length
+            ),
+
             "bounds": bounds_data,
+
             "control_point_count": (
                 self.control_point_count
             ),
+
             "invalid_control_point_count": (
                 self.invalid_control_point_count
             ),
-            "errors": list(self.errors),
-            "warnings": list(self.warnings),
+
+            "errors": list(
+                self.errors
+            ),
+
+            "warnings": list(
+                self.warnings
+            ),
         }

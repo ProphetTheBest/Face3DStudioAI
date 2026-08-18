@@ -11,14 +11,14 @@ Technical Lead AI:
 ChatGPT
 
 Versione documento:
-2.4
+2.5
 
 Ultimo aggiornamento:
 18/08/2026
 
 Stato:
-Roadmap riallineato alla reale architettura del progetto e allo stato
-verificato del Canonical Mapping / Canonical Mesh / MediaPipe / MakeHuman.
+Roadmap riallineato allo stato verificato del progetto dopo
+lo Sprint 23 — Canonical Mesh Validation.
 
 ---
 
@@ -2741,27 +2741,103 @@ e non viene anticipata.
 
 # 47. Sprint 23 — Canonical Mesh Validation
 
-## Obiettivo
+## Stato
 
-Validare geometricamente la Canonical Mesh.
+    IN CORSO — VALIDAZIONE STRUTTURALE, NUMERICA,
+    GEOMETRICA E TOPOLOGICA COMPLETATA
+
+Lo Sprint 23 è stato avviato e la prima parte della
+validazione della Canonical Mesh è stata completata
+e verificata con test reali e test negativi.
+
+Non viene ancora considerato completamente chiuso
+perché restano da implementare e verificare alcuni
+controlli geometrici previsti dalla roadmap.
 
 ---
 
-## Controlli
+## Obiettivo
 
-Verificare:
+Validare geometricamente e topologicamente la Canonical Mesh
+prima del suo utilizzo nella fase di Registration Engine.
 
-- numero vertici;
-- numero triangoli;
+---
+
+## Controlli completati
+
+Sono stati implementati e verificati:
+
+- numero dei vertici;
+- numero dei triangoli;
 - validità degli indici;
-- assenza di riferimenti inesistenti;
-- boundary;
-- normali;
-- orientamento;
-- scala;
-- centro geometrico;
+- assenza di riferimenti a vertici inesistenti;
+- coordinate finite;
+- rilevamento di NaN;
+- rilevamento di Inf;
 - bounding box;
-- distribuzione dei Control Points.
+- dimensioni della mesh;
+- centro geometrico derivato dalla bounding box;
+- boundary edges;
+- boundary vertices;
+- edge non-manifold;
+- triangoli degeneri per indici duplicati;
+- triangoli degeneri per area geometrica nulla;
+- serializzazione del Validation Report;
+- integrazione Template → Canonical Mesh → Validator.
+
+Risultati verificati sulla mesh reale `male1591_head.obj`:
+
+    Vertices:              1604
+    Triangles:             3064
+    Boundary edges:         138
+    Boundary vertices:      138
+    Non-manifold edges:       0
+    Degenerate triangles:     0
+    Non-finite vertices:      0
+    Bounds:                   disponibili
+    Validation:               VALID
+
+Il boundary della mesh reale viene registrato come
+warning diagnostico e non come errore, perché la presenza
+di un'apertura non implica di per sé una mesh corrotta.
+
+Gli edge non-manifold e i triangoli degeneri sono invece
+considerati condizioni di errore.
+
+---
+
+## Test negativi completati
+
+Sono stati verificati separatamente:
+
+- vertice con NaN;
+- vertice con +Inf;
+- vertice con -Inf;
+- triangolo con indice duplicato;
+- triangolo con tre indici distinti ma area nulla;
+- edge condiviso da più di due triangoli.
+
+È stata inoltre verificata l'indipendenza delle diagnostiche,
+in modo che un triangolo degenere non generi artificialmente
+errori non-manifold derivati dal proprio conteggio degli edge.
+
+---
+
+## Controlli ancora da completare
+
+Restano da implementare e verificare:
+
+- calcolo e validazione delle normali delle facce;
+- controllo dell'orientamento coerente delle facce;
+- verifica formale della scala e del sistema di coordinate;
+- verifica della distribuzione dei Control Points sulla Canonical Mesh;
+- eventuale verifica delle componenti connesse direttamente nel
+  CanonicalMeshValidator, se necessaria rispetto ai controlli già eseguiti
+  sul template;
+- visualizzazione dedicata della Canonical Mesh con i 25 Control Points
+  sovrapposti nel MeshViewer.
+
+Questi controlli non devono essere anticipati nella Registration Engine.
 
 ---
 
@@ -2775,19 +2851,24 @@ con:
 
     25 Control Points
 
-sovrapposti.
+ sovrapposti.
+
+L'integrazione grafica verrà affrontata separatamente dalla validazione
+geometrica e non dovrà spostare nella GUI la responsabilità degli
+algoritmi di validazione.
 
 ---
 
-## Risultato
+## Risultato finale dello Sprint
 
-Deve essere possibile vedere chiaramente:
+Lo Sprint 23 sarà considerato COMPLETATO quando tutti i controlli
+previsti saranno implementati, testati e integrati senza regressioni.
 
-    mesh anatomica
-        +
-    25 punti di controllo
+Solo a quel punto il progetto potrà passare allo Sprint 24:
 
-in un'unica scena.
+    Registration Engine
+
+La Registration Engine non deve essere anticipata.
 
 ---
 
@@ -3350,7 +3431,7 @@ Alla data del 17/08/2026:
         COMPLETATO
 
     Sprint 23
-        PROSSIMO / DA INIZIARE
+        IN CORSO — VALIDAZIONE PARZIALE COMPLETATA
 
     Sprint 24
         PIANIFICATO
@@ -4784,8 +4865,15 @@ caratteristica geometrica locale da monitorare.
     PERSISTENZA CANONICAL MAPPING
         IMPLEMENTATA E VERIFICATA
 
-    TEMPLATE GEOMETRY VALIDATION
-        COMPLETATA
+    CANONICAL MESH BUILDER
+        COMPLETATO E VERIFICATO
+
+    CANONICAL MESH VALIDATION
+        IN CORSO — FASE STRUTTURALE, NUMERICA,
+        GEOMETRICA E TOPOLOGICA COMPLETATA
+
+    NORMALI / ORIENTAMENTO
+        DA IMPLEMENTARE E VERIFICARE
 
     REGISTRATION
         DA IMPLEMENTARE
@@ -4797,18 +4885,19 @@ caratteristica geometrica locale da monitorare.
 
 ## Prossima fase
 
-Il prossimo obiettivo operativo è la costruzione
-della Canonical Mesh a partire dal template MakeHuman,
-mantenendo:
+Il prossimo obiettivo operativo è completare lo Sprint 23
+con i controlli ancora mancanti sulla Canonical Mesh:
 
-    - identità dei vertici;
-    - triangolazione;
-    - coordinate originali;
-    - topologia;
-    - compatibilità con il Canonical Mapping.
+    - normali;
+    - orientamento / winding;
+    - scala e sistema di coordinate;
+    - distribuzione dei Control Points;
+    - eventuali controlli topologici residui necessari;
+    - visualizzazione Canonical Mesh + 25 Control Points.
 
-Successivamente dovrà essere eseguita la validazione
-geometrica della Canonical Mesh come asset versionato.
+Solo dopo la chiusura completa dello Sprint 23 verrà avviato:
+
+    Sprint 24 — Registration Engine
 
 Non implementare ancora:
 
@@ -4819,8 +4908,8 @@ Non implementare ancora:
 - texture projection;
 - ricostruzione da fotografia.
 
-Queste funzionalità saranno affrontate negli Sprint
-successivi secondo la sequenza prevista dalla roadmap.
+Queste funzionalità rimangono successive secondo la sequenza
+prevista dalla roadmap.
 
 ---
 
@@ -7988,12 +8077,17 @@ del punto sulla bitmap visualizzata.
 
 ## Prossimo lavoro
 
-Il prossimo obiettivo è:
+Il prossimo obiettivo è completare:
 
     Sprint 23 — Canonical Mesh Validation
 
 Lo Sprint 22 — Canonical Mesh Builder è stato completato
 e verificato.
+
+La prima parte dello Sprint 23 è stata implementata, testata
+e integrata nel commit:
+
+    15c99cd Sprint 23: complete canonical mesh validation
 
 Il checkpoint corrente comprende:
 
@@ -8010,22 +8104,39 @@ Il checkpoint corrente comprende:
     [x] Template sorgente invariato
     [x] Compatibilità Canonical Mapping
     [x] Mapping 25/25 COMPLETE
-    [x] Test finali Sprint 22
+    [x] Validazione dei conteggi della Canonical Mesh
+    [x] Validazione degli indici triangolari
+    [x] Validazione coordinate finite
+    [x] Rilevamento NaN / Inf
+    [x] Bounding box e centro geometrico
+    [x] Boundary edges / boundary vertices
+    [x] Edge non-manifold
+    [x] Triangoli degeneri
+    [x] Test negativi della validazione
+    [x] Serializzazione del Validation Report
+    [x] Test finale integrato Sprint 23 — fase implementata
 
-Prima di modificare il codice dello Sprint 23:
+Restano da completare nello Sprint 23:
+
+    [ ] Normali delle facce
+    [ ] Orientamento / winding delle facce
+    [ ] Verifica formale di scala e sistema di coordinate
+    [ ] Distribuzione dei 25 Control Points
+    [ ] Eventuali controlli topologici residui necessari
+    [ ] Visualizzazione Canonical Mesh + 25 Control Points
+    [ ] Test finale completo dello Sprint 23
+    [ ] Aggiornamento documentazione finale dello Sprint 23
+    [ ] Commit finale di chiusura dello Sprint 23
+
+Regole operative:
 
     1. verificare la struttura reale del progetto;
-    2. verificare se esiste già una responsabilità equivalente;
-    3. non duplicare classi o servizi;
-    4. definire la responsabilità del validator;
-    5. implementare una sola modifica;
-    6. eseguire il test;
-    7. verificare le regressioni;
-    8. aggiornare la documentazione;
-    9. eseguire il commit.
-
-Lo Sprint 23 dovrà occuparsi esclusivamente
-della validazione geometrica della Canonical Mesh.
+    2. non duplicare classi o servizi;
+    3. una sola modifica principale alla volta;
+    4. eseguire il test dopo ogni modifica;
+    5. verificare le regressioni;
+    6. aggiornare la documentazione;
+    7. chiudere lo Sprint con commit e push.
 
 La fase di Registration Engine rimane successiva
 e non deve essere anticipata.
@@ -8037,7 +8148,9 @@ e non deve essere anticipata.
 La nuova sessione di sviluppo deve ripartire
 dal presente checkpoint.
 
-Non ripetere il lavoro già completato
-a meno che un test non dimostri una regressione.
+Non ripetere il lavoro già completato a meno che
+un test non dimostri una regressione.
 
-Il prossimo step operativo è lo Sprint 23 — Canonical Mesh Validation.
+Il prossimo step operativo è il completamento dello
+Sprint 23, a partire dalla validazione delle normali
+e dell'orientamento delle facce.
