@@ -11,10 +11,10 @@ Technical Lead AI:
 ChatGPT
 
 Versione documento:
-2.3
+2.4
 
 Ultimo aggiornamento:
-17/08/2026
+18/08/2026
 
 Stato:
 Roadmap riallineato alla reale architettura del progetto e allo stato
@@ -201,7 +201,7 @@ basata sul modello MakeHuman.
 
 ## 5.2 MakeHuman Canonical Mesh
 
-La futura Canonical Mesh di Face3D Studio sarà invece costruita
+La Canonical Mesh di Face3D Studio è stata costruita
 sulla base del template MakeHuman.
 
 Il suo riferimento iniziale è:
@@ -1939,7 +1939,8 @@ Alla data di questo aggiornamento:
         ALGORITMO DA IMPLEMENTARE
 
     CANONICAL MESH
-        DA COSTRUIRE
+        COMPLETATA — Sprint 22
+        1604 vertici / 3064 triangoli
 
     HEAD RECONSTRUCTION
         INFRASTRUTTURA PRONTA
@@ -2562,24 +2563,58 @@ deve poter essere riutilizzato.
 
 # 46. Sprint 22 — Canonical Mesh Builder
 
+## Stato
+
+    COMPLETATO E VERIFICATO
+
+Data completamento:
+
+    18/08/2026
+
+---
+
 ## Obiettivo
 
 Creare il primo vero:
 
     CanonicalMeshBuilder
 
+con il compito di costruire la Canonical Mesh
+derivata dal template MakeHuman della testa.
+
+---
+
+## Template utilizzato
+
+Template:
+
+    male1591
+
+Mesh specifica della testa:
+
+    male1591_head.obj
+
+Il modello completo `male1591.obj` rimane disponibile
+nel progetto, ma non viene utilizzato per la Canonical Mesh
+della testa.
+
+La scelta della mesh specifica della testa è coerente
+con l'obiettivo della pipeline attuale.
+
 ---
 
 ## Responsabilità
 
-Il builder deve costruire la geometria canonica
+Il builder costruisce la geometria canonica
 partendo dal template MakeHuman.
 
-La pipeline deve essere:
+La pipeline verificata è:
 
     MakeHuman Template
             ↓
     TemplateLoader
+            ↓
+    HeadTemplate
             ↓
     CanonicalMeshBuilder
             ↓
@@ -2587,7 +2622,103 @@ La pipeline deve essere:
 
 ---
 
-## Importante
+## Geometria prodotta
+
+La Canonical Mesh contiene:
+
+    1604 vertici
+    3064 triangoli
+
+Il Builder mantiene:
+
+- identità dei vertici;
+- ordine dei vertici;
+- coordinate geometriche;
+- indici dei triangoli;
+- triangolazione;
+- topologia della mesh.
+
+La Canonical Mesh è una rappresentazione derivata
+e indipendente dal template sorgente.
+
+Il template originale non viene modificato.
+
+---
+
+## Validazione minima del Builder
+
+Il `CanonicalMeshBuilder` esegue una validazione minima
+dei prerequisiti del template prima della costruzione.
+
+Sono verificati:
+
+- tipo corretto di `HeadTemplate`;
+- presenza dei vertici;
+- validità degli indici dei triangoli;
+- assenza di riferimenti a vertici inesistenti;
+- coerenza dei metadati identificativi.
+
+La validazione geometrica completa della Canonical Mesh
+rimane responsabilità dello Sprint 23.
+
+---
+
+## Compatibilità con Canonical Mapping
+
+La Canonical Mesh è stata verificata rispetto
+al Canonical Mapping definitivo.
+
+Risultato:
+
+    Mapping: 25/25
+    Mapping status: COMPLETE
+
+Sono state verificate per tutti i 25 Control Points:
+
+- esistenza del vertice;
+- validità dell'indice;
+- corrispondenza delle coordinate;
+- compatibilità dei metadati;
+- unicità dei vertici associati.
+
+---
+
+## Test eseguiti
+
+Sono stati superati:
+
+- test del template reale;
+- test della copia delle coordinate;
+- test della copia degli indici;
+- test dell'indipendenza degli oggetti Vertex3D;
+- test dell'indipendenza degli oggetti Triangle;
+- test del template privo di vertici;
+- test di un triangolo con indice fuori range;
+- test di compatibilità Canonical Mapping ↔ Canonical Mesh;
+- test finale integrato dello Sprint 22.
+
+---
+
+## Test finale integrato
+
+Risultato:
+
+    Template vertices: 1604
+    Template triangles: 3064
+    Canonical vertices: 1604
+    Canonical triangles: 3064
+
+    Counts: OK
+    Geometry: OK
+    Object independence: OK
+    Template unchanged: OK
+    Canonical Mapping: OK
+
+    FINAL RESULT: SPRINT 22 OK
+
+---
+
+## Regola architetturale
 
 Il CanonicalMeshBuilder non deve occuparsi di:
 
@@ -2596,10 +2727,15 @@ Il CanonicalMeshBuilder non deve occuparsi di:
 - fotografia;
 - rendering;
 - texture;
-- esportazione.
+- esportazione;
+- Registration Engine;
+- deformazione.
 
 Deve occuparsi esclusivamente
 della costruzione della geometria canonica.
+
+La Registration Engine rimane successiva
+e non viene anticipata.
 
 ---
 
@@ -3211,10 +3347,10 @@ Alla data del 17/08/2026:
         COMPLETATO
 
     Sprint 22
-        PIANIFICATO
+        COMPLETATO
 
     Sprint 23
-        PIANIFICATO
+        PROSSIMO / DA INIZIARE
 
     Sprint 24
         PIANIFICATO
@@ -7841,6 +7977,12 @@ del punto sulla bitmap visualizzata.
     [x] Validazione geometrica preliminare del template
     [x] Normalizzazione dei Control Points
     [x] Verifica di simmetria bilaterale
+    [x] CanonicalMeshBuilder
+    [x] Canonical Mesh costruita da `male1591_head.obj`
+    [x] 1604 vertici / 3064 triangoli
+    [x] Verifica indipendenza della geometria
+    [x] Verifica Canonical Mapping ↔ Canonical Mesh
+    [x] Test finale integrato Sprint 22
 
 ---
 
@@ -7848,23 +7990,42 @@ del punto sulla bitmap visualizzata.
 
 Il prossimo obiettivo è:
 
-    Sprint 22 — Canonical Mesh Builder
+    Sprint 23 — Canonical Mesh Validation
 
-Prima di modificare il codice:
+Lo Sprint 22 — Canonical Mesh Builder è stato completato
+e verificato.
+
+Il checkpoint corrente comprende:
+
+    [x] CanonicalMesh
+    [x] CanonicalMeshBuilder
+    [x] Template `male1591/head`
+    [x] Mesh sorgente `male1591_head.obj`
+    [x] 1604 vertici
+    [x] 3064 triangoli
+    [x] Copia indipendente della geometria
+    [x] Preservazione delle coordinate
+    [x] Preservazione degli indici
+    [x] Preservazione della triangolazione
+    [x] Template sorgente invariato
+    [x] Compatibilità Canonical Mapping
+    [x] Mapping 25/25 COMPLETE
+    [x] Test finali Sprint 22
+
+Prima di modificare il codice dello Sprint 23:
 
     1. verificare la struttura reale del progetto;
     2. verificare se esiste già una responsabilità equivalente;
     3. non duplicare classi o servizi;
-    4. definire il minimo modello geometrico necessario;
+    4. definire la responsabilità del validator;
     5. implementare una sola modifica;
     6. eseguire il test;
     7. verificare le regressioni;
     8. aggiornare la documentazione;
     9. eseguire il commit.
 
-Il Canonical Mesh Builder dovrà produrre una rappresentazione
-derivata e identificabile del template MakeHuman senza
-modificare il template sorgente.
+Lo Sprint 23 dovrà occuparsi esclusivamente
+della validazione geometrica della Canonical Mesh.
 
 La fase di Registration Engine rimane successiva
 e non deve essere anticipata.
@@ -7879,5 +8040,4 @@ dal presente checkpoint.
 Non ripetere il lavoro già completato
 a meno che un test non dimostri una regressione.
 
-Il prossimo step operativo deve essere esplicitato
-prima di modificare qualsiasi file.
+Il prossimo step operativo è lo Sprint 23 — Canonical Mesh Validation.

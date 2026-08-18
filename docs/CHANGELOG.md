@@ -341,3 +341,145 @@ derivata dal template MakeHuman, mantenendo:
 - compatibilità con il Canonical Mapping.
 
 La Registration Engine non viene ancora implementata.
+---
+
+## Sprint 22 — Canonical Mesh Builder
+
+Data: 18/08/2026
+
+### Stato
+
+[x] Sprint 22 completato e verificato.
+
+### Canonical Mesh
+
+È stata completata la costruzione della Canonical Mesh
+derivata dal template MakeHuman della testa.
+
+Template utilizzato:
+
+    male1591
+
+Mesh sorgente:
+
+    male1591_head.obj
+
+La scelta della mesh specifica della testa è intenzionale:
+il modello completo `male1591.obj` rimane disponibile nel progetto,
+ma non viene utilizzato per la costruzione della Canonical Mesh
+della testa.
+
+### Implementazione
+
+È stato implementato il:
+
+    CanonicalMeshBuilder
+
+La pipeline verificata è:
+
+    MakeHuman Template
+            ↓
+    TemplateLoader
+            ↓
+    HeadTemplate
+            ↓
+    CanonicalMeshBuilder
+            ↓
+    CanonicalMesh
+
+Il Builder costruisce una rappresentazione derivata e indipendente
+dal template sorgente.
+
+Sono mantenuti:
+
+- identità e ordine dei vertici;
+- coordinate geometriche;
+- indici dei triangoli;
+- triangolazione;
+- topologia della mesh.
+
+Il template sorgente non viene modificato.
+
+### Validazione minima del Builder
+
+Il `CanonicalMeshBuilder` verifica i prerequisiti minimi
+necessari alla costruzione della Canonical Mesh.
+
+Sono stati implementati controlli per:
+
+- tipo corretto di `HeadTemplate`;
+- presenza dei vertici;
+- validità degli indici dei triangoli;
+- assenza di riferimenti a vertici inesistenti;
+- coerenza dei metadati identificativi.
+
+La validazione geometrica completa della Canonical Mesh
+rimane responsabilità dello Sprint 23.
+
+### Risultato geometrico
+
+La Canonical Mesh costruita dal template `male1591_head.obj`
+contiene:
+
+    1604 vertici
+    3064 triangoli
+
+È stata verificata la corrispondenza completa con la geometria
+del template originale.
+
+### Compatibilità con Canonical Mapping
+
+La Canonical Mesh è stata verificata rispetto al
+Canonical Mapping definitivo.
+
+Risultato:
+
+    Mapping: 25/25
+    Mapping status: COMPLETE
+
+Per tutti i 25 Control Points è stata verificata:
+
+- esistenza del vertice indicato;
+- validità dell'indice;
+- corrispondenza delle coordinate;
+- compatibilità dei metadati;
+- unicità dei vertici associati.
+
+### Test eseguiti
+
+Sono stati superati i seguenti test:
+
+- caricamento del template reale `male1591/head`;
+- costruzione della Canonical Mesh;
+- verifica di 1604 vertici;
+- verifica di 3064 triangoli;
+- verifica delle coordinate;
+- verifica degli indici dei triangoli;
+- verifica della triangolazione;
+- verifica dell'indipendenza degli oggetti Vertex3D;
+- verifica dell'indipendenza degli oggetti Triangle;
+- verifica che il template originale rimanga invariato;
+- verifica del template privo di vertici;
+- verifica di un triangolo con indice fuori range;
+- verifica della compatibilità Canonical Mapping ↔ Canonical Mesh;
+- test finale integrato dello Sprint 22.
+
+### Test finale integrato
+
+Risultato:
+
+    Counts: OK
+    Geometry: OK
+    Object independence: OK
+    Template unchanged: OK
+    Canonical Mapping: OK
+
+    FINAL RESULT: SPRINT 22 OK
+
+### Prossimo obiettivo
+
+Il prossimo lavoro è lo:
+
+    Sprint 23 — Canonical Mesh Validation
+
+La Registration Engine non viene ancora implementata.
