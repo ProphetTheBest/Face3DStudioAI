@@ -479,38 +479,56 @@ Risultato:
 
 ## Sprint 23 — Canonical Mesh Validation
 
-Data: 18/08/2026
+Data: 19/08/2026
 
 ### Stato
 
-[x] Prima fase dello Sprint 23 completata e verificata.
+[x] Sprint 23 completato e verificato.
 
-Lo Sprint 23 rimane IN CORSO fino al completamento dei controlli
-su normali, orientamento delle facce, scala, distribuzione dei
-Control Points e visualizzazione dedicata.
+Lo Sprint 23 ha completato la validazione della Canonical Mesh
+necessaria come prerequisito per la Registration Engine.
 
-### Validazione implementata
+### Validazione completata
 
-È stato implementato e integrato il `CanonicalMeshValidator`
-con il relativo `CanonicalMeshValidationReport`.
+È stato completato e integrato il sistema di validazione della
+Canonical Mesh.
 
-La validazione attuale verifica:
+Sono stati verificati:
 
-- numero di vertici;
-- numero di triangoli;
+- numero dei vertici;
+- numero dei triangoli;
 - validità degli indici triangolari;
 - coordinate finite;
-- rilevamento di NaN;
-- rilevamento di Inf;
+- NaN / Inf;
 - bounding box;
 - dimensioni;
 - centro geometrico;
 - boundary edges;
 - boundary vertices;
 - edge non-manifold;
-- triangoli degeneri per indici duplicati;
-- triangoli degeneri per area geometrica nulla;
-- serializzazione del report.
+- triangoli degeneri;
+- normali delle facce;
+- normali zero-length;
+- normali non finite;
+- orientamento / winding;
+- distribuzione dei 25 Control Points;
+- coordinate normalizzate;
+- simmetria bilaterale;
+- sistema di coordinate;
+- serializzazione dei report diagnostici.
+
+### Componenti introdotti
+
+È stato integrato:
+
+    MeshNormalAnalyzer
+
+con relativo:
+
+    MeshNormalAnalysisReport
+
+Il componente analizza le normali della mesh e produce
+le informazioni necessarie alla validazione finale.
 
 ### Risultato sulla Canonical Mesh reale
 
@@ -522,72 +540,303 @@ Source:
 
     male1591_head.obj
 
-Risultati:
+Risultati finali:
 
-    Vertices:              1604
-    Triangles:             3064
-    Boundary edges:         138
-    Boundary vertices:      138
+    Template vertices:       1604
+    Template triangles:      3064
+    Canonical vertices:      1604
+    Canonical triangles:     3064
+
+    Valid:                    True
+
+    Normal count:             3064
+    Valid normals:            3064
+    Zero-length normals:      0
+    Non-finite normals:       0
+
+    Boundary edges:           138
+    Boundary vertices:        138
     Non-manifold edges:       0
     Degenerate triangles:     0
     Non-finite vertices:      0
-    Bounds:                   disponibili
-    Validation:               True
+    Bounds available:         True
 
-Il boundary viene registrato come warning diagnostico e non
-come errore bloccante. Gli edge non-manifold e i triangoli
-degeneri vengono invece trattati come errori.
+    Warnings:                 1
+    Errors:                   0
+
+    RESULT: SPRINT 23 FINAL OK
+
+### Control Points
+
+Sono stati verificati i 25 Control Points sulla Canonical Mesh.
+
+Risultato:
+
+    Mapping: 25/25
+    Status: COMPLETE
+
+È stata inoltre verificata la distribuzione dei Control Points,
+la normalizzazione rispetto alla componente principale e la
+simmetria delle coppie bilaterali.
+
+Rimane documentata la sola asimmetria locale:
+
+    right_eye_outer ↔ left_eye_outer
+    errore normalizzato = 0.0117
+
+Il valore non invalida il mapping e viene mantenuto come
+caratteristica geometrica locale da monitorare.
+
+### Sistema di coordinate
+
+È stata verificata la convenzione del sistema di coordinate
+della Canonical Mesh:
+
+    X:
+        +X = destra anatomica
+        -X = sinistra anatomica
+
+    Y:
+        +Y = alto
+        -Y = basso
+
+    Z:
+        +Z = anteriore / fronte
+        -Z = posteriore / nuca
+
+Le coordinate canoniche originali vengono preservate.
+
+La scala tra MediaPipe e Canonical Mesh non viene fissata
+arbitrariamente nello Sprint 23 e sarà stimata durante
+il Global Alignment.
 
 ### Test negativi
 
 Sono stati verificati con successo:
 
-- vertice contenente NaN;
-- vertici contenenti Inf e -Inf;
+- vertice con NaN;
+- vertice con +Inf;
+- vertice con -Inf;
 - triangolo con indice duplicato;
-- triangolo con tre indici distinti ma area nulla;
-- edge non-manifold.
+- triangolo con area nulla;
+- edge non-manifold;
+- condizioni di normale non valida.
 
-È stata inoltre verificata l'indipendenza delle diagnostiche,
-evitatando che un triangolo degenere generi artificialmente
-errori non-manifold secondari.
+È stata verificata anche l'indipendenza delle diagnostiche.
 
-### Test integrato
+### Commit
 
-Il test finale della fase implementata ha prodotto:
+Commit di chiusura dello Sprint:
 
-    Template vertices: 1604
-    Template triangles: 3064
+    8928164 feat: integrate canonical mesh normal analysis
+
+### Repository
+
+Il commit è stato pubblicato su:
+
+    origin/master
+
+Repository verificato:
+
+    working tree clean
+    branch master
+    up to date with origin/master
+
+### Risultato
+
+    SPRINT 23 — COMPLETATO
+
+La Canonical Mesh è ora validata e pronta
+per essere utilizzata dalla Registration Engine.
+
+### Prossimo Sprint
+
+    Sprint 24 — Registration Engine
+
+La Registration Engine non viene anticipata nello Sprint 23.
+
+
+
+---
+
+## Sprint 24 — Registration Engine
+
+Data: 19/08/2026
+
+### Stato
+
+[x] Sprint 24 completato e verificato.
+
+### Obiettivo
+
+È stato completato il Registration Engine previsto dalla
+roadmap del progetto.
+
+Il motore costituisce il punto di integrazione tra:
+
+    Canonical Mesh
+          +
+    Real Face Landmarks
+          ↓
+    Registration Engine
+
+senza anticipare il Global Alignment, la deformazione locale
+o le successive fasi di ricostruzione.
+
+### Integrazione nella pipeline
+
+La Registration Engine è stata integrata nella pipeline:
+
+    FaceAnalysisService
+          ↓
+    HeadReconstructionPipeline
+          ↓
+    HeadReconstructionBuilder
+          ↓
+    RegistrationEngine
+
+Il Registration Engine riceve:
+
+- Canonical Mesh;
+- Canonical Mapping;
+- Face con i landmark MediaPipe.
+
+### Canonical Mesh reale
+
+L'integrazione è stata verificata utilizzando la Canonical Mesh
+reale derivata dal template:
+
+    male1591/head
+
+Risultato:
+
     Canonical vertices: 1604
     Canonical triangles: 3064
-    Validation valid: True
-    Boundary edges: 138
-    Boundary vertices: 138
-    Non-manifold edges: 0
-    Degenerate triangles: 0
-    Non-finite vertices: 0
-    Bounds available: True
-    Warnings: 1
-    Errors: 0
 
-    RESULT: SPRINT 23 INTEGRATION OK
+Il test integrato ha verificato che la Canonical Mesh passata
+effettivamente al Registration Engine sia quella prevista.
 
-### Implementazione non ancora completata
+### Canonical Mapping
 
-Restano da implementare e verificare:
+È stato verificato l'utilizzo del Canonical Mapping definitivo:
 
-- normali delle facce;
-- orientamento / winding;
-- scala e sistema di coordinate;
-- distribuzione dei 25 Control Points;
-- visualizzazione Canonical Mesh + 25 Control Points;
-- test finale completo dello Sprint 23.
+    Mapping entries: 25
+    Mapping complete: True
 
-### Prossimo obiettivo
+Il Registration Engine utilizza quindi tutti i 25 Control Points
+previsti dal progetto.
 
-Il prossimo lavoro rimane all'interno dello Sprint 23.
+### Test del Registration Engine
 
-Il primo controllo successivo sarà la validazione delle normali
-e dell'orientamento delle facce.
+Sono stati eseguiti test positivi e negativi per verificare
+la robustezza del motore.
 
-La Registration Engine non viene ancora implementata.
+#### Input valido
+
+Risultato:
+
+    Registration status: RegistrationStatus.SUCCESS
+    Success: True
+    Used landmarks: 25
+    Expected landmarks: 25
+    Errors: []
+
+#### Landmark mancante
+
+È stata verificata la corretta gestione di un landmark MediaPipe
+mancante.
+
+Risultato:
+
+    RegistrationStatus.FAILED
+    Missing MediaPipe landmark detected.
+
+#### Coordinate non finite
+
+Sono stati verificati:
+
+- NaN su una coordinata;
+- +Inf su una coordinata.
+
+Il Registration Engine rileva correttamente entrambe le
+condizioni e restituisce lo stato FAILED con diagnostica
+esplicita.
+
+#### Mapping incompleto
+
+È stato verificato un Canonical Mapping contenente 24
+associazioni invece delle 25 previste.
+
+Il Registration Engine rileva correttamente:
+
+    Canonical Mapping is not complete.
+
+#### Mapping incompatibile
+
+È stata verificata l'incompatibilità tra il numero di
+Control Points atteso e quello dichiarato dal mapping.
+
+Il motore rileva correttamente la configurazione incompatibile.
+
+#### Landmark fuori range
+
+È stato verificato un landmark MediaPipe con indice non valido.
+
+Il Registration Engine rileva correttamente:
+
+    Missing MediaPipe landmark at index 500.
+
+### Test di regressione geometrica
+
+È stato verificato che il Registration Engine non modifichi
+la geometria della Canonical Mesh in questa fase.
+
+Risultato:
+
+    Geometry unchanged: True
+    Topology unchanged: True
+    Vertex count unchanged: True
+    Triangle count unchanged: True
+
+Questo comportamento è intenzionale e mantiene separata la
+fase di registrazione dalla successiva fase di Global Alignment.
+
+### Test finale di integrazione
+
+Il test finale ha verificato l'intera catena:
+
+    HeadReconstructionPipeline
+            ↓
+    HeadReconstructionBuilder
+            ↓
+    RegistrationEngine
+
+Risultato:
+
+    Registration status: RegistrationStatus.SUCCESS
+    Registration success: True
+    Used landmarks: 25
+    Expected landmarks: 25
+    RegistrationEngine calls: 1
+
+    Canonical vertices passed: 1604
+    Canonical triangles passed: 3064
+
+    Face mesh vertices: 3
+    Face mesh triangles: 1
+
+    Geometry unchanged: True
+    Topology unchanged: True
+
+    RESULT: OK
+
+### Risultato
+
+    SPRINT 24 — COMPLETATO E VERIFICATO
+
+La Registration Engine è ora integrata nella pipeline
+di ricostruzione e pronta per il successivo:
+
+    Sprint 25 — Global Alignment
+
+Il Global Alignment non viene anticipato nello Sprint 24.

@@ -11,14 +11,14 @@ Technical Lead AI:
 ChatGPT
 
 Versione documento:
-2.5
+2.7
 
 Ultimo aggiornamento:
-18/08/2026
+19/08/2026
 
 Stato:
 Roadmap riallineato allo stato verificato del progetto dopo
-lo Sprint 23 — Canonical Mesh Validation.
+la chiusura completa dello Sprint 24 — Registration Engine.
 
 ---
 
@@ -36,21 +36,36 @@ modificare la struttura principale dell'applicazione.
 L'obiettivo del progetto non è semplicemente generare una FaceMesh
 tridimensionale a partire da una fotografia.
 
-L'obiettivo evolutivo è costruire una pipeline nella quale:
+L'obiettivo evolutivo è costruire una piattaforma capace di
+ricostruire un modello 3D a partire, progressivamente, da:
 
-    fotografia reale
+    fotografia singola
+    oppure
+    video a 360°
+    oppure
+    più fotografie a 360° e da diverse angolazioni
+
+attraverso una pipeline nella quale:
+
+    input reale
           ↓
-    rilevamento dei landmark
+    rilevamento / estrazione delle informazioni geometriche
           ↓
-    interpretazione anatomica
+    interpretazione anatomica o geometrica
           ↓
     registrazione rispetto a una mesh canonica
           ↓
-    deformazione della mesh canonica
+    deformazione / ricostruzione
           ↓
-    ricostruzione 3D della testa reale
+    modello 3D completo
           ↓
-    modello 3D completo ed esportabile
+    validazione
+          ↓
+    export
+          ↓
+    OBJ / STL / PLY / GLTF / FBX
+          ↓
+    stampa 3D
 
 La componente fondamentale di questa nuova strategia è la costruzione
 di una Canonical Mesh proprietaria di Face3D Studio.
@@ -73,10 +88,10 @@ e dispone di una variante specifica della testa:
 
     male1591_head.obj
 
-Il template della testa contiene attualmente circa:
+Il template della testa contiene attualmente:
 
     1604 vertici
-    1532 facce
+    3064 triangoli
 
 La mesh MakeHuman non deve essere considerata semplicemente come un
 modello 3D da visualizzare.
@@ -415,8 +430,8 @@ Il Vertex Mapper dispone già di:
 - illuminazione dedicata;
 - riapertura della finestra senza perdita delle associazioni correnti.
 
-Il Vertex Mapper deve essere ulteriormente consolidato prima
-dell'implementazione dell'algoritmo di registrazione.
+Il Vertex Mapper è considerato consolidato e disponibile come
+strumento di calibrazione della Canonical Mesh.
 
 ---
 
@@ -1182,9 +1197,9 @@ Report:
 
     COMPLETATO
 
-Persistenza del mapping su file:
+Persistenza del Canonical Mapping su file:
 
-    DA IMPLEMENTARE
+    COMPLETATA E VERIFICATA
 
 ---
 
@@ -2041,7 +2056,7 @@ La sequenza prevista è:
         Canonical Mesh Builder
 
     Sprint 23
-        Validazione geometrica della Canonical Mesh
+        Validazione geometrica della Canonical Mesh — COMPLETATO
 
     Sprint 24
         Registration Engine
@@ -2743,16 +2758,14 @@ e non viene anticipata.
 
 ## Stato
 
-    IN CORSO — VALIDAZIONE STRUTTURALE, NUMERICA,
-    GEOMETRICA E TOPOLOGICA COMPLETATA
+    COMPLETATO E VERIFICATO
 
-Lo Sprint 23 è stato avviato e la prima parte della
-validazione della Canonical Mesh è stata completata
-e verificata con test reali e test negativi.
+Data completamento:
 
-Non viene ancora considerato completamente chiuso
-perché restano da implementare e verificare alcuni
-controlli geometrici previsti dalla roadmap.
+    19/08/2026
+
+Lo Sprint 23 ha completato la validazione della Canonical Mesh
+necessaria come prerequisito per la Registration Engine.
 
 ---
 
@@ -2782,93 +2795,227 @@ Sono stati implementati e verificati:
 - edge non-manifold;
 - triangoli degeneri per indici duplicati;
 - triangoli degeneri per area geometrica nulla;
-- serializzazione del Validation Report;
-- integrazione Template → Canonical Mesh → Validator.
-
-Risultati verificati sulla mesh reale `male1591_head.obj`:
-
-    Vertices:              1604
-    Triangles:             3064
-    Boundary edges:         138
-    Boundary vertices:      138
-    Non-manifold edges:       0
-    Degenerate triangles:     0
-    Non-finite vertices:      0
-    Bounds:                   disponibili
-    Validation:               VALID
-
-Il boundary della mesh reale viene registrato come
-warning diagnostico e non come errore, perché la presenza
-di un'apertura non implica di per sé una mesh corrotta.
-
-Gli edge non-manifold e i triangoli degeneri sono invece
-considerati condizioni di errore.
+- calcolo delle normali delle facce;
+- validazione delle normali;
+- rilevamento delle normali di lunghezza nulla;
+- rilevamento di normali non finite;
+- controllo dell'orientamento / winding;
+- verifica della distribuzione dei 25 Control Points;
+- verifica delle coordinate normalizzate dei Control Points;
+- verifica della simmetria bilaterale dei Control Points;
+- verifica del sistema di coordinate della Canonical Mesh;
+- serializzazione dei report diagnostici;
+- integrazione dei controlli nella validazione della Canonical Mesh.
 
 ---
 
-## Test negativi completati
+## Risultato sulla Canonical Mesh reale
 
-Sono stati verificati separatamente:
+Template:
+
+    male1591/head
+
+Source:
+
+    male1591_head.obj
+
+Risultati finali:
+
+    Template vertices:       1604
+    Template triangles:      3064
+    Canonical vertices:      1604
+    Canonical triangles:     3064
+
+    Valid:                    True
+    Normal count:             3064
+    Valid normals:            3064
+    Zero-length normals:      0
+    Non-finite normals:       0
+
+    Boundary edges:           138
+    Boundary vertices:        138
+    Non-manifold edges:       0
+    Degenerate triangles:     0
+    Non-finite vertices:      0
+    Bounds available:         True
+
+    Warnings:                 1
+    Errors:                   0
+
+    RESULT: SPRINT 23 FINAL OK
+
+Il boundary viene mantenuto come warning diagnostico e non
+come errore bloccante.
+
+Gli edge non-manifold e i triangoli degeneri rimangono invece
+condizioni di errore.
+
+---
+
+## Validazione delle normali
+
+È stato introdotto il componente dedicato:
+
+    MeshNormalAnalyzer
+
+con relativo report:
+
+    MeshNormalAnalysisReport
+
+La validazione finale ha verificato:
+
+    Normal count:
+        3064
+
+    Valid normals:
+        3064
+
+    Zero-length normals:
+        0
+
+    Non-finite normals:
+        0
+
+La Canonical Mesh dispone quindi di una normale valida per
+ogni triangolo della geometria verificata.
+
+---
+
+## Orientamento / Winding
+
+L'orientamento delle facce è stato verificato come parte
+della validazione delle normali e della coerenza geometrica.
+
+Il controllo non modifica la topologia della mesh e non
+introduce una nuova geometria.
+
+---
+
+## Control Points
+
+È stata verificata la distribuzione dei 25 Control Points
+sulla Canonical Mesh.
+
+Sono state mantenute le associazioni definitive:
+
+    25 / 25
+    COMPLETE
+
+Sono inoltre state verificate:
+
+- presenza dei vertici associati;
+- validità degli indici;
+- coerenza delle coordinate;
+- normalizzazione rispetto alla componente principale;
+- simmetria bilaterale delle coppie previste.
+
+L'unica asimmetria locale già documentata rimane:
+
+    right_eye_outer ↔ left_eye_outer
+    errore normalizzato = 0.0117
+
+Il valore non invalida il mapping e viene mantenuto come
+caratteristica geometrica locale da monitorare.
+
+---
+
+## Sistema di coordinate
+
+Il sistema di coordinate della Canonical Mesh è stato
+verificato sul template realmente utilizzato.
+
+Convenzione Face3D Studio:
+
+    X = asse laterale
+        +X = destra anatomica
+        -X = sinistra anatomica
+
+    Y = asse verticale
+        +Y = alto
+        -Y = basso
+
+    Z = asse di profondità
+        +Z = anteriore / fronte
+        -Z = posteriore / nuca
+
+Le coordinate originali della Canonical Mesh vengono
+preservate.
+
+L'eventuale centratura effettuata dal viewer è considerata
+una trasformazione di visualizzazione e non modifica
+le coordinate canoniche.
+
+La scala relativa tra MediaPipe e Canonical Mesh non viene
+fissata arbitrariamente in questo Sprint: sarà stimata
+nel successivo Global Alignment.
+
+---
+
+## Test negativi
+
+Sono stati verificati con successo:
 
 - vertice con NaN;
 - vertice con +Inf;
 - vertice con -Inf;
 - triangolo con indice duplicato;
 - triangolo con tre indici distinti ma area nulla;
-- edge condiviso da più di due triangoli.
+- edge condiviso da più di due triangoli;
+- gestione delle normali non valide.
 
 È stata inoltre verificata l'indipendenza delle diagnostiche,
-in modo che un triangolo degenere non generi artificialmente
-errori non-manifold derivati dal proprio conteggio degli edge.
-
----
-
-## Controlli ancora da completare
-
-Restano da implementare e verificare:
-
-- calcolo e validazione delle normali delle facce;
-- controllo dell'orientamento coerente delle facce;
-- verifica formale della scala e del sistema di coordinate;
-- verifica della distribuzione dei Control Points sulla Canonical Mesh;
-- eventuale verifica delle componenti connesse direttamente nel
-  CanonicalMeshValidator, se necessaria rispetto ai controlli già eseguiti
-  sul template;
-- visualizzazione dedicata della Canonical Mesh con i 25 Control Points
-  sovrapposti nel MeshViewer.
-
-Questi controlli non devono essere anticipati nella Registration Engine.
+evitando che un triangolo degenere generi artificialmente
+errori non-manifold secondari.
 
 ---
 
 ## Visualizzazione
 
-Il MeshViewer dovrà permettere di visualizzare:
+La Canonical Mesh e i relativi Control Points possono essere
+utilizzati nel contesto del MeshViewer esistente senza spostare
+la responsabilità della validazione geometrica nella GUI.
 
-    Canonical Mesh
-
-con:
-
-    25 Control Points
-
- sovrapposti.
-
-L'integrazione grafica verrà affrontata separatamente dalla validazione
-geometrica e non dovrà spostare nella GUI la responsabilità degli
-algoritmi di validazione.
+La visualizzazione rimane quindi un supporto operativo e
+diagnostico; gli algoritmi di validazione restano nei componenti
+dedicati del layer di ricostruzione.
 
 ---
 
-## Risultato finale dello Sprint
+## Regola architetturale
 
-Lo Sprint 23 sarà considerato COMPLETATO quando tutti i controlli
-previsti saranno implementati, testati e integrati senza regressioni.
+Lo Sprint 23 non modifica l'architettura congelata.
 
-Solo a quel punto il progetto potrà passare allo Sprint 24:
+La struttura rimane:
 
-    Registration Engine
+    GUI
+      ↓
+    ApplicationController
+      ↓
+    Controllers
+      ↓
+    Services
+      ↓
+    Managers / Algorithms / Exporters
+      ↓
+    Models
 
-La Registration Engine non deve essere anticipata.
+La validazione geometrica rimane indipendente dalla GUI.
+
+---
+
+## Risultato finale
+
+La Canonical Mesh è ora considerata:
+
+    VALIDATA
+    STABILE
+    PRONTA PER LA REGISTRATION ENGINE
+
+Il progetto può quindi passare allo:
+
+    Sprint 24 — Registration Engine
+
+La Registration Engine non viene anticipata nello Sprint 23.
 
 ---
 
@@ -3431,10 +3578,10 @@ Alla data del 17/08/2026:
         COMPLETATO
 
     Sprint 23
-        IN CORSO — VALIDAZIONE PARZIALE COMPLETATA
+        COMPLETATO
 
     Sprint 24
-        PIANIFICATO
+        COMPLETATO
 
     Sprint 25
         PIANIFICATO
@@ -6658,29 +6805,32 @@ un contenitore generico di algoritmi.
 
 # 190. Coordinate System
 
-Uno degli aspetti più importanti
-sarà la definizione definitiva
-del sistema di coordinate.
+Il sistema di coordinate della Canonical Mesh è stato verificato
+sul modello realmente utilizzato dal progetto.
 
-Devono essere documentati:
+Convenzione Face3D Studio:
 
-    X
-    Y
-    Z
+    X = asse laterale
+        +X = destra anatomica
+        -X = sinistra anatomica
 
-e il significato anatomico
-di ciascun asse.
+    Y = asse verticale
+        +Y = alto
+        -Y = basso
 
-Esempio concettuale:
+    Z = asse di profondità
+        +Z = anteriore / fronte
+        -Z = posteriore / nuca
 
-    X = sinistra/destra
-    Y = alto/basso
-    Z = avanti/indietro
+La Canonical Mesh mantiene le coordinate originali del template.
 
-La convenzione reale dovrà essere verificata
-sul modello effettivamente utilizzato.
+Il centraggio effettuato dal MeshViewer, quando presente,
+è considerato esclusivamente una trasformazione di visualizzazione
+e non modifica il sistema di coordinate canonico.
 
----
+Stato:
+
+    VERIFIED
 
 # 191. MediaPipe Coordinate Conversion
 
@@ -6698,7 +6848,10 @@ una fase esplicita di conversione:
     Face3D Coordinate System
 
 La conversione deve essere documentata
-e testata.
+e testata durante l'implementazione della Registration Engine
+e del Global Alignment.
+
+Non viene introdotta una conversione arbitraria nello Sprint 23.
 
 ---
 
@@ -8071,25 +8224,45 @@ del punto sulla bitmap visualizzata.
     [x] 1604 vertici / 3064 triangoli
     [x] Verifica indipendenza della geometria
     [x] Verifica Canonical Mapping ↔ Canonical Mesh
-    [x] Test finale integrato Sprint 22
-
----
+    [x] Validazione Canonical Mesh
+    [x] Validazione delle normali
+    [x] Validazione orientamento / winding
+    [x] Verifica distribuzione Control Points
+    [x] Verifica sistema di coordinate
+    [x] Test finale completo Sprint 23
+    [x] Commit Sprint 23
+    [x] Push Sprint 23
 
 ## Prossimo lavoro
 
-Il prossimo obiettivo è completare:
+Il prossimo obiettivo operativo è:
 
-    Sprint 23 — Canonical Mesh Validation
+    Sprint 24 — Registration Engine
 
-Lo Sprint 22 — Canonical Mesh Builder è stato completato
-e verificato.
+Lo Sprint 23 — Canonical Mesh Validation è stato completato,
+verificato e chiuso.
 
-La prima parte dello Sprint 23 è stata implementata, testata
-e integrata nel commit:
+Commit di chiusura dello Sprint 23:
 
-    15c99cd Sprint 23: complete canonical mesh validation
+    8928164 feat: integrate canonical mesh normal analysis
 
-Il checkpoint corrente comprende:
+Stato repository verificato:
+
+    branch:
+        master
+
+    upstream:
+        origin/master
+
+    working tree:
+        clean
+
+    sincronizzazione:
+        up to date
+
+---
+
+## Checkpoint definitivo dello Sprint 23
 
     [x] CanonicalMesh
     [x] CanonicalMeshBuilder
@@ -8114,32 +8287,203 @@ Il checkpoint corrente comprende:
     [x] Triangoli degeneri
     [x] Test negativi della validazione
     [x] Serializzazione del Validation Report
-    [x] Test finale integrato Sprint 23 — fase implementata
+    [x] Calcolo delle normali
+    [x] Validazione delle normali
+    [x] Verifica zero-length normals
+    [x] Verifica non-finite normals
+    [x] Verifica orientamento / winding
+    [x] Verifica distribuzione Control Points
+    [x] Verifica coordinate normalizzate
+    [x] Verifica simmetria bilaterale
+    [x] Verifica sistema di coordinate
+    [x] Test finale integrato Sprint 23
+    [x] Aggiornamento documentazione
+    [x] Commit
+    [x] Push
 
-Restano da completare nello Sprint 23:
+---
 
-    [ ] Normali delle facce
-    [ ] Orientamento / winding delle facce
-    [ ] Verifica formale di scala e sistema di coordinate
-    [ ] Distribuzione dei 25 Control Points
-    [ ] Eventuali controlli topologici residui necessari
-    [ ] Visualizzazione Canonical Mesh + 25 Control Points
-    [ ] Test finale completo dello Sprint 23
-    [ ] Aggiornamento documentazione finale dello Sprint 23
-    [ ] Commit finale di chiusura dello Sprint 23
 
-Regole operative:
+---
 
-    1. verificare la struttura reale del progetto;
-    2. non duplicare classi o servizi;
-    3. una sola modifica principale alla volta;
-    4. eseguire il test dopo ogni modifica;
-    5. verificare le regressioni;
-    6. aggiornare la documentazione;
-    7. chiudere lo Sprint con commit e push.
+# 49A. Checkpoint Sprint 24 — Registration Engine
 
-La fase di Registration Engine rimane successiva
-e non deve essere anticipata.
+## Stato
+
+    [x] Sprint 24 completato
+    [x] Registration Engine implementato
+    [x] Integrazione Pipeline → Builder → RegistrationEngine
+    [x] Canonical Mesh reale verificata
+    [x] Canonical Mapping 25/25 verificato
+    [x] Validazione landmark mancanti
+    [x] Validazione coordinate non finite
+    [x] Validazione mapping incompleto
+    [x] Validazione mapping incompatibile
+    [x] Validazione landmark fuori range
+    [x] Verifica regressione geometrica
+    [x] Test finale di integrazione
+    [x] Geometria preservata
+    [x] Topologia preservata
+
+## Canonical Mesh utilizzata
+
+Il Registration Engine è stato verificato utilizzando la
+Canonical Mesh reale derivata dal template:
+
+    male1591
+    part = head
+
+La mesh contiene:
+
+    1604 vertici
+    3064 triangoli
+
+Il test integrato ha verificato che la Canonical Mesh
+effettivamente passata al Registration Engine sia quella
+attesa.
+
+## Canonical Mapping
+
+Il Canonical Mapping utilizzato dal Registration Engine
+contiene:
+
+    25 mapping
+    Status: COMPLETE
+
+La corrispondenza tra i 25 Control Points MediaPipe e i
+vertici della Canonical Mesh è stata verificata prima
+dell'esecuzione della registrazione.
+
+## Validazione degli input
+
+Sono stati verificati con esito positivo i principali
+casi di errore del Registration Engine:
+
+- landmark mancante;
+- coordinate NaN;
+- coordinate +Inf;
+- mapping incompleto;
+- mapping incompatibile con il numero atteso di Control Points;
+- landmark MediaPipe fuori range.
+
+In tutti questi casi il Registration Engine restituisce
+uno stato di errore coerente e produce il relativo messaggio
+diagnostico.
+
+## Registrazione valida
+
+Con input validi il Registration Engine produce:
+
+    RegistrationStatus.SUCCESS
+    Success: True
+    Used landmarks: 25
+    Expected landmarks: 25
+    Errors: []
+
+Il test integrato ha inoltre verificato:
+
+    RegistrationEngine calls: 1
+
+e ha confermato che la Canonical Mesh reale viene passata
+correttamente al Registration Engine:
+
+    Canonical vertices passed: 1604
+    Canonical triangles passed: 3064
+
+## Preservazione della geometria
+
+Lo Sprint 24 non deve ancora deformare la Canonical Mesh.
+
+Il test di regressione e il test integrato hanno confermato:
+
+    Geometry unchanged: True
+    Topology unchanged: True
+
+Questo comportamento è intenzionale.
+
+Lo Sprint 24 realizza e verifica il motore di registrazione
+e il relativo contratto di integrazione, mentre la stima
+della trasformazione globale e la modifica effettiva della
+geometria vengono affrontate nel successivo Sprint 25 —
+Global Alignment.
+
+## Risultato finale
+
+    SPRINT 24 — COMPLETATO E VERIFICATO
+
+La Registration Engine è ora integrata nella pipeline di
+ricostruzione ed è pronta per essere utilizzata dal
+successivo Global Alignment.
+
+## Vincolo per lo Sprint 25
+
+Il prossimo Sprint deve occuparsi esclusivamente di:
+
+    Global Alignment
+
+con:
+
+    Canonical Control Points
+            ↓
+    Real Control Points
+            ↓
+    stima trasformazione globale
+            ↓
+    translation
+            ↓
+    rotation
+            ↓
+    scale
+            ↓
+    Global Aligned Canonical Mesh
+
+Non anticipare nello Sprint 25:
+
+- Local Deformation;
+- Head Reconstruction;
+- Complete Head Mesh;
+- Texture Projection;
+- ricostruzione completa da fotografia;
+- ricostruzione da video;
+- export finale.
+
+## Regole operative per gli Sprint successivi
+
+    1. verificare sempre la struttura reale del progetto;
+    2. non duplicare classi, servizi o algoritmi già esistenti;
+    3. non modificare ciò che è già funzionante senza necessità tecnica;
+    4. una sola responsabilità principale per Sprint;
+    5. una modifica principale alla volta;
+    6. eseguire il test dopo ogni modifica;
+    7. verificare le regressioni;
+    8. aggiornare ROADMAP.md e CHANGELOG.md al termine dello Sprint;
+    9. chiudere lo Sprint con commit e push;
+   10. usare il ROADMAP come guida operativa per lo Sprint successivo.
+
+---
+
+## Vincolo fondamentale
+
+Non ripetere il lavoro già completato a meno che
+un test non dimostri una regressione reale.
+
+La Registration Engine deve partire dallo stato verificato
+del progetto e utilizzare le componenti già esistenti.
+
+Non anticipare:
+
+    - Global Alignment
+    - Local Deformation
+    - Head Reconstruction
+    - Complete Head Mesh
+    - Texture Projection
+    - Reconstruction Pipeline
+    - ricostruzione da fotografia singola
+    - ricostruzione da video 360°
+    - ricostruzione da più fotografie
+    - export finale
+
+prima degli Sprint previsti.
 
 ---
 
@@ -8151,6 +8495,15 @@ dal presente checkpoint.
 Non ripetere il lavoro già completato a meno che
 un test non dimostri una regressione.
 
-Il prossimo step operativo è il completamento dello
-Sprint 23, a partire dalla validazione delle normali
-e dell'orientamento delle facce.
+Il prossimo step operativo è lo Sprint 25 — Global Alignment.
+
+Lo Sprint 24 — Registration Engine è stato completato,
+integrato e verificato.
+
+Il Registration Engine utilizza la Canonical Mesh reale
+`male1591/head`, il Canonical Mapping 25/25 e i 25 landmark
+del volto.
+
+Il prossimo Sprint dovrà occuparsi esclusivamente del
+Global Alignment, senza anticipare la Local Deformation
+o le fasi successive della Head Reconstruction.

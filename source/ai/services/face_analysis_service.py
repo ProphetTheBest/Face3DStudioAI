@@ -12,31 +12,39 @@ Versione:
 ==========================================================
 """
 
+
 from source.ai.providers.mediapipe_face_detector import (
     MediaPipeFaceDetector,
 )
+
 
 from source.ai.providers.mediapipe_face_landmarker import (
     MediaPipeFaceLandmarker,
 )
 
+
 from source.ai.services.detection_service import (
     DetectionService,
 )
+
 
 from source.models.geometry.builders.face_mesh_builder import (
     FaceMeshBuilder,
 )
 
+
 from source.reconstruction.pipeline.head_reconstruction_pipeline import (
     HeadReconstructionPipeline,
 )
 
+
 from source.mapping.uv.uv_mapper import UVMapper
+
 
 from source.models.assets.image_asset import ImageAsset
 from source.models.face import Face
 from source.models.geometry.vertex3d import Vertex3D
+from source.models.mapping.canonical_mapping import CanonicalMapping
 from source.analysis.geometry.geometry_analyzer import GeometryAnalyzer
 from source.analysis.landmarks.landmark_analyzer import LandmarkAnalyzer
 
@@ -61,6 +69,7 @@ class FaceAnalysisService:
         self,
         image_asset: ImageAsset,
         filename: str,
+        canonical_mapping: CanonicalMapping | None = None,
     ) -> None:
 
         detections = self._detection_service.detect(
@@ -120,7 +129,8 @@ class FaceAnalysisService:
                 #
 
                 face = HeadReconstructionPipeline.build(
-                    face
+                    face,
+                    canonical_mapping,
                 )
 
                 UVMapper.generate(

@@ -12,7 +12,9 @@ Versione:
 ==========================================================
 """
 
+
 from PySide6.QtCore import Qt
+
 
 from PySide6.QtWidgets import (
     QSplitter,
@@ -20,18 +22,22 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
+
 from source.ai.services.face_analysis_service import (
     FaceAnalysisService,
 )
+
 
 from source.controllers.project_controller import (
     ProjectController,
 )
 
+
 from source.models import face
 from source.models.assets.image_asset import (
     ImageAsset,
 )
+
 
 from source.widgets.base_panel import BasePanel
 
@@ -83,7 +89,7 @@ class ViewerPanel(BasePanel):
 
         splitter.setStretchFactor(1, 2)
 
-        splitter.setSizes([500, 300])        
+        splitter.setSizes([500, 300])
 
         container = QWidget()
 
@@ -94,6 +100,7 @@ class ViewerPanel(BasePanel):
         layout.addWidget(splitter)
 
         self.add_content_widget(container)
+
     # ---------------------------------------------------------
 
     # ---------------------------------------------------------
@@ -129,12 +136,31 @@ class ViewerPanel(BasePanel):
         )
 
         #
+        # Canonical Mapping
+        #
+        # Il mapping appartiene al progetto
+        # corrente e viene passato al servizio
+        # di analisi senza introdurre una
+        # dipendenza del Reconstruction Engine
+        # dalla GUI.
+        #
+
+        project = self._controller.get_project()
+
+        canonical_mapping = (
+            project.canonical_mapping
+            if project is not None
+            else None
+        )
+
+        #
         # Analisi AI
         #
 
         self._analysis_service.analyze(
             asset,
             filename,
+            canonical_mapping,
         )
 
         #
@@ -219,4 +245,4 @@ class ViewerPanel(BasePanel):
 
         self.image_viewer.show_landmarks(
             face.landmarks
-        )         
+        )

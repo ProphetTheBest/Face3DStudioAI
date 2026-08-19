@@ -12,15 +12,34 @@ Versione:
 ==========================================================
 """
 
+
 from source.models.face import Face
+
+
+from source.models.mapping.canonical_mapping import (
+    CanonicalMapping,
+)
+
+
+from source.models.canonical_mesh import (
+    CanonicalMesh,
+)
+
 
 from source.reconstruction.builders.head_reconstruction_builder import (
     HeadReconstructionBuilder,
 )
 
+
+from source.reconstruction.builders.canonical_mesh_builder import (
+    CanonicalMeshBuilder,
+)
+
+
 from source.reconstruction.loaders.template_loader import (
     TemplateLoader,
 )
+
 
 from source.reconstruction.analyzers.template_analyzer import (
     TemplateAnalyzer,
@@ -35,13 +54,27 @@ class HeadReconstructionPipeline:
 
     _template = None
 
+    _canonical_mesh: CanonicalMesh | None = None
+
     @staticmethod
     def build(
         face: Face,
+        canonical_mapping: CanonicalMapping | None = None,
     ) -> Face:
         """
         Punto di ingresso del
         Reconstruction Engine.
+
+        Il Canonical Mapping viene ricevuto
+        dal livello applicativo e inoltrato
+        al Reconstruction Builder.
+
+        La Canonical Mesh viene costruita
+        una sola volta a partire dal template.
+
+        Può essere None per mantenere
+        la compatibilità con le chiamate
+        esistenti.
         """
 
         #
@@ -53,7 +86,8 @@ class HeadReconstructionPipeline:
 
             HeadReconstructionPipeline._template = (
                 TemplateLoader.load(
-                    "male1591"
+                    "male1591",
+                    "head",
                 )
             )
 
@@ -90,11 +124,30 @@ class HeadReconstructionPipeline:
             print()
 
         #
+        # Costruzione Canonical Mesh
+        # (una sola volta)
+        #
+
+        if HeadReconstructionPipeline._canonical_mesh is None:
+
+            HeadReconstructionPipeline._canonical_mesh = (
+                CanonicalMeshBuilder.build(
+                    HeadReconstructionPipeline._template,
+                    canonical_mesh_id="makehuman_male1591_head",
+                    canonical_mesh_version="1.0",
+                    template_id="male1591",
+                    template_version="1.0",
+                )
+            )
+
+        #
         # Reconstruction
         #
 
         face = HeadReconstructionBuilder.build(
-            face
+            face,
+            HeadReconstructionPipeline._canonical_mesh,
+            canonical_mapping,
         )
 
         return face
