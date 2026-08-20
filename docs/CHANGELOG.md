@@ -840,3 +840,244 @@ di ricostruzione e pronta per il successivo:
     Sprint 25 — Global Alignment
 
 Il Global Alignment non viene anticipato nello Sprint 24.
+
+---
+
+## Sprint 25 — Global Alignment
+
+Data: 20/08/2026
+
+### Stato
+
+[x] Sprint 25 completato e verificato.
+
+### Obiettivo
+
+È stato completato il primo livello della registrazione geometrica
+globale della Canonical Mesh rispetto ai Control Points del volto reale.
+
+Il Global Alignment determina una trasformazione composta da:
+
+    translation
+    rotation
+    scale
+
+e la rappresenta tramite una matrice omogenea 4×4.
+
+### RegistrationTransformation
+
+È stato introdotto il modello:
+
+    source/models/registration_transformation.py
+
+Il modello rappresenta la trasformazione geometrica globale attraverso
+una matrice NumPy 4×4.
+
+La trasformazione espone:
+
+- matrice omogenea 4×4;
+- componente di traslazione;
+- sottomatrice 3×3 di rotazione / scala;
+- costruzione della trasformazione identità.
+
+Sono stati inoltre introdotti controlli per:
+
+- dimensione obbligatoria 4×4;
+- valori esclusivamente finiti;
+- rifiuto di matrici non valide.
+
+### RegistrationResult
+
+Il modello `RegistrationResult` è stato esteso per rappresentare
+anche il risultato del Global Alignment.
+
+Sono ora disponibili:
+
+- `transformation`;
+- `mean_error`;
+- `rms_error`;
+- `max_error`.
+
+È stata mantenuta la compatibilità con il precedente contratto
+del Registration Engine.
+
+Il test di backward compatibility ha confermato che un risultato
+di registrazione precedente continua a essere utilizzabile senza
+una trasformazione globale valorizzata.
+
+### Global Alignment con Umeyama
+
+Il `RegistrationEngine` è stato esteso con la stima della
+trasformazione globale mediante algoritmo di Umeyama.
+
+La procedura utilizza:
+
+    Canonical Control Points
+            +
+    Real Control Points
+            ↓
+    stima della trasformazione
+            ↓
+    scale
+    rotation
+    translation
+            ↓
+    matrice omogenea 4×4
+
+La trasformazione viene applicata concettualmente all'intera
+Canonical Mesh, mantenendo separata la fase di Global Alignment
+dalla successiva Local Deformation.
+
+### Test matematico
+
+È stato eseguito un test deterministico con trasformazione nota.
+
+Risultati:
+
+    Expected scale:       1.75
+    Recovered scale:      1.75
+    Scale error:          0.0
+
+    Rotation error:
+        1.1102230246251565e-16
+
+    Translation error:
+        4.440892098500626e-16
+
+    Mean point error:
+        4.440892098500626e-16
+
+    RMS point error:
+        4.440892098500626e-16
+
+    Max point error:
+        4.440892098500626e-16
+
+    RESULT: OK
+
+### Test integrato
+
+È stato eseguito il test completo:
+
+    test_global_alignment.py
+
+Il test ha verificato:
+
+    Canonical Control Points: 25
+    Real Control Points:      25
+    Mapping entries:          25
+    Mapping complete:         True
+    Canonical mesh vertices:  25
+    Face landmarks:           25
+
+Risultato della registrazione:
+
+    Status: RegistrationStatus.SUCCESS
+    Success: True
+    Used landmarks: 25
+    Expected landmarks: 25
+    Registration error:
+        2.936915022422793e-16
+
+    Mean error:
+        2.739988667247874e-16
+
+    RMS error:
+        2.936915022422793e-16
+
+    Max error:
+        5.23691153334427e-16
+
+    Errors: []
+    Warnings: []
+
+### Trasformazione verificata
+
+La trasformazione recuperata nel test integrato è risultata
+coerente con i parametri attesi:
+
+    Expected scale:    1.35
+    Recovered scale:  1.35
+    Scale error:      0.0
+
+    Expected translation:
+        [ 0.1  -0.05  0.2 ]
+
+    Recovered translation:
+        [ 0.1  -0.05  0.2 ]
+
+    Translation error:
+        5.967448757360216e-16
+
+    Rotation error:
+        5.599433397402341e-16
+
+    RESULT: OK
+
+### Regression Test dello Sprint 24
+
+Dopo l'introduzione del Global Alignment è stato rieseguito
+il test di integrazione della Registration Engine dello
+Sprint 24.
+
+Il test ha confermato:
+
+    Registration status: RegistrationStatus.SUCCESS
+    Registration success: True
+    Used landmarks: 25
+    Expected landmarks: 25
+    RegistrationEngine calls: 1
+
+    Canonical vertices passed: 1604
+    Canonical triangles passed: 3064
+
+    Face mesh vertices: 3
+    Face mesh triangles: 1
+
+    Geometry unchanged: True
+    Topology unchanged: True
+
+    RESULT: OK
+
+Il comportamento precedente della Registration Engine è quindi
+rimasto compatibile e non sono state rilevate regressioni.
+
+### Test del modello di trasformazione
+
+Sono stati verificati:
+
+- costruzione della trasformazione identità;
+- matrice 4×4;
+- estrazione della traslazione;
+- estrazione della sottomatrice 3×3;
+- rifiuto di una matrice 3×3;
+- rifiuto di una matrice 5×5;
+- rifiuto di valori NaN.
+
+Tutti i test hanno prodotto il risultato atteso.
+
+### File introdotti o modificati
+
+Sono stati introdotti:
+
+    source/models/registration_transformation.py
+    test_global_alignment.py
+
+Sono stati modificati:
+
+    source/models/registration_result.py
+    source/reconstruction/registration/registration_engine.py
+
+### Risultato finale
+
+    SPRINT 25 — COMPLETATO E VERIFICATO
+
+Il Registration Engine dispone ora del primo livello di
+registrazione geometrica globale mediante trasformazione
+omogenea 4×4 e stima Umeyama.
+
+La pipeline è pronta per il successivo:
+
+    Sprint 26 — Local Deformation
+
+La Local Deformation non viene anticipata nello Sprint 25.

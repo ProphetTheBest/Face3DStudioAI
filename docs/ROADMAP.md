@@ -11,14 +11,14 @@ Technical Lead AI:
 ChatGPT
 
 Versione documento:
-2.7
+2.8
 
 Ultimo aggiornamento:
-19/08/2026
+20/08/2026
 
 Stato:
 Roadmap riallineato allo stato verificato del progetto dopo
-la chiusura completa dello Sprint 24 — Registration Engine.
+la chiusura completa dello Sprint 25 — Global Alignment.
 
 ---
 
@@ -3073,6 +3073,10 @@ Deve produrre una nuova geometria.
 
 # 49. Sprint 25 — Global Alignment
 
+## Stato
+
+    [x] COMPLETATO E VERIFICATO
+
 ## Obiettivo
 
 Implementare il primo livello della registrazione:
@@ -3557,7 +3561,7 @@ nel ROADMAP storico. :contentReference[oaicite:1]{index=1}
 
 # 62. Stato della roadmap
 
-Alla data del 17/08/2026:
+Alla data del 20/08/2026:
 
     Sprint 17.1
         COMPLETATO
@@ -3584,7 +3588,7 @@ Alla data del 17/08/2026:
         COMPLETATO
 
     Sprint 25
-        PIANIFICATO
+        COMPLETATO
 
     Sprint 26
         PIANIFICATO
@@ -8487,23 +8491,253 @@ prima degli Sprint previsti.
 
 ---
 
+## Checkpoint Sprint 25 — Global Alignment
+
+### Stato
+
+    [x] Sprint 25 completato
+    [x] Global Alignment implementato
+    [x] RegistrationTransformation introdotto
+    [x] matrice omogenea 4×4 verificata
+    [x] validazione dimensione matrice verificata
+    [x] validazione valori finiti verificata
+    [x] RegistrationResult esteso
+    [x] backward compatibility verificata
+    [x] algoritmo Umeyama implementato
+    [x] stima scala verificata
+    [x] stima rotazione verificata
+    [x] stima traslazione verificata
+    [x] errori mean / RMS / max verificati
+    [x] test matematico deterministico
+    [x] test integrato Global Alignment
+    [x] regression test Registration Engine
+    [x] geometria della Canonical Mesh preservata
+    [x] topologia preservata
+    [x] test finale OK
+
+### Trasformazione globale
+
+Il Global Alignment utilizza i:
+
+    25 Canonical Control Points
+            +
+    25 Real Control Points
+
+per stimare una trasformazione globale composta da:
+
+    translation
+    rotation
+    scale
+
+La trasformazione viene rappresentata mediante:
+
+    RegistrationTransformation
+
+con matrice omogenea:
+
+    4 × 4
+
+### Algoritmo
+
+La stima della trasformazione globale è stata implementata
+mediante algoritmo di Umeyama.
+
+Il test deterministico ha recuperato correttamente:
+
+    scale = 1.75
+
+con errore di scala:
+
+    0.0
+
+La rotazione e la traslazione sono state recuperate con errori
+numerici dell'ordine della precisione floating point.
+
+### Test integrato
+
+Il test `test_global_alignment.py` ha verificato:
+
+    Canonical Control Points: 25
+    Real Control Points:      25
+    Mapping entries:          25
+    Mapping complete:         True
+
+La registrazione ha prodotto:
+
+    RegistrationStatus.SUCCESS
+    Used landmarks: 25
+    Expected landmarks: 25
+    Errors: []
+    Warnings: []
+
+con errori:
+
+    Registration error:
+        2.936915022422793e-16
+
+    Mean error:
+        2.739988667247874e-16
+
+    RMS error:
+        2.936915022422793e-16
+
+    Max error:
+        5.23691153334427e-16
+
+### Trasformazione verificata
+
+Nel test integrato sono stati recuperati:
+
+    scale = 1.35
+
+    translation =
+        [ 0.1  -0.05  0.2 ]
+
+con:
+
+    Scale error:
+        0.0
+
+    Rotation error:
+        5.599433397402341e-16
+
+    Translation error:
+        5.967448757360216e-16
+
+    RESULT: OK
+
+### Regression Test
+
+È stato rieseguito il test integrato della Registration Engine
+dello Sprint 24.
+
+Risultato:
+
+    Registration status: RegistrationStatus.SUCCESS
+    Registration success: True
+    Used landmarks: 25
+    Expected landmarks: 25
+    RegistrationEngine calls: 1
+
+    Canonical vertices passed: 1604
+    Canonical triangles passed: 3064
+
+    Geometry unchanged: True
+    Topology unchanged: True
+
+    RESULT: OK
+
+La modifica dello Sprint 25 non ha introdotto regressioni
+nel comportamento già verificato dello Sprint 24.
+
+### Modello RegistrationTransformation
+
+Il modello è stato validato anche con test negativi:
+
+    3×3 → ValueError
+    5×5 → ValueError
+    NaN → ValueError
+
+La matrice identità 4×4 è stata verificata correttamente.
+
+### Stato della pipeline
+
+La pipeline concettuale raggiunta è:
+
+    Canonical Mesh
+          +
+    Real Face Landmarks
+          ↓
+    Registration Engine
+          ↓
+    Global Alignment
+          ↓
+    Aligned Canonical Mesh
+
+La Local Deformation non viene anticipata nello Sprint 25.
+
+### Repository
+
+Checkpoint Git di implementazione dello Sprint 25:
+
+    d55285a
+    Sprint 25: implement Global Alignment
+
+Il commit è stato pubblicato su:
+
+    origin/master
+
+Repository verificato:
+
+    branch master
+    working tree clean
+    up to date with origin/master
+
+La documentazione di chiusura dello Sprint 25 viene consolidata
+con un commit separato prima dell'avvio dello Sprint 26.
+
+---
+
+## Regola di chiusura dello Sprint
+
+Da questo Sprint viene adottata formalmente la seguente procedura:
+
+    sviluppo
+       ↓
+    test
+       ↓
+    integration test
+       ↓
+    regression test
+       ↓
+    aggiornamento ROADMAP.md
+       ↓
+    aggiornamento CHANGELOG.md
+       ↓
+    verifica Git
+       ↓
+    commit
+       ↓
+    push
+       ↓
+    repository clean
+       ↓
+    nuovo Sprint
+
+Uno Sprint non viene considerato definitivamente chiuso
+finché codice, test, documentazione e repository Git non
+sono coerenti con lo stato raggiunto.
+
+---
+
 ## Regola per la nuova sessione
 
 La nuova sessione di sviluppo deve ripartire
 dal presente checkpoint.
 
 Non ripetere il lavoro già completato a meno che
-un test non dimostri una regressione.
+un test non dimostri una regressione reale.
 
-Il prossimo step operativo è lo Sprint 25 — Global Alignment.
+Il prossimo step operativo è:
 
-Lo Sprint 24 — Registration Engine è stato completato,
+    Sprint 26 — Local Deformation
+
+Lo Sprint 25 — Global Alignment è stato completato,
 integrato e verificato.
 
-Il Registration Engine utilizza la Canonical Mesh reale
-`male1591/head`, il Canonical Mapping 25/25 e i 25 landmark
-del volto.
+Il Registration Engine utilizza ora la trasformazione globale
+stimata mediante Umeyama e rappresentata con matrice omogenea 4×4.
 
-Il prossimo Sprint dovrà occuparsi esclusivamente del
-Global Alignment, senza anticipare la Local Deformation
-o le fasi successive della Head Reconstruction.
+Lo Sprint 26 dovrà occuparsi esclusivamente della:
+
+    Local Deformation
+
+senza anticipare:
+
+    - Head Reconstruction
+    - Complete Head Mesh
+    - Texture Projection
+    - ricostruzione completa da fotografia
+    - ricostruzione da video 360°
+    - ricostruzione da più fotografie
+    - export finale
