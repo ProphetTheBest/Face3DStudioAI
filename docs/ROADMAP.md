@@ -11,14 +11,14 @@ Technical Lead AI:
 ChatGPT
 
 Versione documento:
-2.8
+2.9
 
 Ultimo aggiornamento:
 20/08/2026
 
 Stato:
 Roadmap riallineato allo stato verificato del progetto dopo
-la chiusura completa dello Sprint 25 — Global Alignment.
+la chiusura completa dello Sprint 26 — Local Deformation.
 
 ---
 
@@ -3591,7 +3591,7 @@ Alla data del 20/08/2026:
         COMPLETATO
 
     Sprint 26
-        PIANIFICATO
+        COMPLETATO
 
     Sprint 27
         PIANIFICATO
@@ -8675,12 +8675,95 @@ Repository verificato:
 
 La documentazione di chiusura dello Sprint 25 viene consolidata
 con un commit separato prima dell'avvio dello Sprint 26.
-
 ---
+## Chiusura Sprint 26 — Local Deformation
 
-## Regola di chiusura dello Sprint
+Lo Sprint 26 — Local Deformation è stato completato,
+integrato e verificato.
 
-Da questo Sprint viene adottata formalmente la seguente procedura:
+### Risultato
+
+La pipeline verificata è:
+
+    Canonical Mesh
+          +
+    Real Face Landmarks
+          ↓
+    Registration Engine
+          ↓
+    Global Alignment
+          ↓
+    Aligned Canonical Mesh
+          ↓
+    Local Deformation
+          ↓
+    Personalized Mesh
+
+È stato introdotto il:
+
+    LocalDeformationEngine
+
+che utilizza una interpolazione RBF con kernel Thin Plate Spline
+tramite `scipy.interpolate.RBFInterpolator`.
+
+La scelta è stata verificata con test deterministici e con
+una mesh reale di 1604 vertici e 3064 triangoli.
+
+### Verifiche principali
+
+Sono risultati verificati:
+
+    Control Points: 25
+    Mesh vertices: 1604
+    Mesh triangles: 3064
+
+    Control Point max error:
+        7.850462293418876e-17
+
+    Global Alignment:
+        SUCCESS
+
+    Local Deformation:
+        SUCCESS
+
+    Canonical geometry unchanged:
+        True
+
+    Canonical topology unchanged:
+        True
+
+La deformazione mantiene quindi l'identità dei vertici e la
+topologia della Canonical Mesh, modificando le coordinate della
+geometria derivata.
+
+### Test finali dello Sprint 26
+
+Sono stati superati:
+
+    test_global_alignment.py
+    test_global_alignment_local_deformation.py
+    test_reconstruction_registration.py
+    test_head_reconstruction_builder.py
+    test_head_reconstruction_pipeline.py
+
+Tutti hanno prodotto:
+
+    RESULT: OK
+
+### Milestone
+
+La Milestone E:
+
+    Personalized Mesh
+    Sprint 26
+
+è ora:
+
+    COMPLETATA E VERIFICATA
+
+### Regola di chiusura dello Sprint
+
+La chiusura segue la procedura:
 
     sviluppo
        ↓
@@ -8704,40 +8787,23 @@ Da questo Sprint viene adottata formalmente la seguente procedura:
        ↓
     nuovo Sprint
 
-Uno Sprint non viene considerato definitivamente chiuso
-finché codice, test, documentazione e repository Git non
-sono coerenti con lo stato raggiunto.
+### Prossimo Sprint
 
----
+    Sprint 27 — Head Reconstruction
 
-## Regola per la nuova sessione
+Lo Sprint 27 dovrà occuparsi della ricostruzione della testa
+a partire dalla Personalized Mesh.
 
-La nuova sessione di sviluppo deve ripartire
-dal presente checkpoint.
+Non anticipare:
 
-Non ripetere il lavoro già completato a meno che
-un test non dimostri una regressione reale.
+    - Complete Head Mesh oltre quanto previsto dallo Sprint 27;
+    - Texture Projection;
+    - ricostruzione completa da fotografia;
+    - ricostruzione da video 360°;
+    - ricostruzione da più fotografie;
+    - export finale.
 
-Il prossimo step operativo è:
+La nuova sessione deve ripartire dal presente checkpoint.
 
-    Sprint 26 — Local Deformation
-
-Lo Sprint 25 — Global Alignment è stato completato,
-integrato e verificato.
-
-Il Registration Engine utilizza ora la trasformazione globale
-stimata mediante Umeyama e rappresentata con matrice omogenea 4×4.
-
-Lo Sprint 26 dovrà occuparsi esclusivamente della:
-
-    Local Deformation
-
-senza anticipare:
-
-    - Head Reconstruction
-    - Complete Head Mesh
-    - Texture Projection
-    - ricostruzione completa da fotografia
-    - ricostruzione da video 360°
-    - ricostruzione da più fotografie
-    - export finale
+Non ripetere il lavoro già completato a meno che un test non
+dimostri una regressione reale.

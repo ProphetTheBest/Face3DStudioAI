@@ -13,12 +13,43 @@ HeadReconstructionPipeline
 HeadReconstructionBuilder
     ↓
 RegistrationEngine
+    ↓
+Global Alignment
+    ↓
+Local Deformation
+    ↓
+FaceMesh ricostruita
 
-Il test non modifica la geometria.
+Il test utilizza:
+    - Canonical Mesh reale;
+    - Canonical Mapping completo;
+    - Face sintetico con 25 landmark;
+    - RegistrationEngine intercettato tramite mock.
+
+Il test verifica inoltre che:
+
+    - il Face passato al RegistrationEngine sia quello
+      corretto;
+    - la Canonical Mesh utilizzata sia semanticamente
+      quella attesa;
+    - il Canonical Mapping sia quello fornito;
+    - RegistrationResult sia valido;
+    - la Face restituita sia la stessa istanza;
+    - la FaceMesh finale venga ricostruita sulla base
+      della Canonical Mesh;
+    - la mesh finale contenga 1604 vertici;
+    - la mesh finale contenga 3064 triangoli;
+    - la geometria finale sia finita;
+    - la topologia finale coincida con quella della
+      Canonical Mesh;
+    - la Canonical Mesh originale non venga modificata.
+
 ==========================================================
 """
 
 from unittest.mock import patch
+
+import numpy as np
 
 
 from source.ai.models.face_detection import (
@@ -92,6 +123,11 @@ from source.models.registration_result import (
 )
 
 
+from source.models.registration_transformation import (
+    RegistrationTransformation,
+)
+
+
 from source.models.landmarks.standard_landmarks import (
     create_standard_landmarks,
 )
@@ -99,7 +135,9 @@ from source.models.landmarks.standard_landmarks import (
 
 EXPECTED_VERTICES = 1604
 
+
 EXPECTED_TRIANGLES = 3064
+
 
 EXPECTED_CONTROL_POINTS = 25
 
@@ -197,13 +235,16 @@ def build_face_mesh() -> FaceMesh:
     """
     Costruisce una FaceMesh minima ma valida.
 
-    Il test non deve ricostruire la mesh completa
-    MediaPipe: deve soltanto fornire al
+    La mesh iniziale è volutamente minimale:
+    viene utilizzata soltanto per fornire al
     HeadReconstructionBuilder una FaceMesh
-    non nulla sulla quale MeshBoundaryAnalyzer
-    possa operare.
+    valida sulla quale operare.
 
-    La mesh contiene:
+    La ricostruzione Sprint 26 sostituisce
+    successivamente questa mesh con la geometria
+    derivata dalla Canonical Mesh.
+
+    La mesh iniziale contiene:
 
     - 3 vertici;
     - 3 edge;
@@ -262,7 +303,7 @@ def build_face() -> Face:
 
     - FaceDetection valida;
     - 25 FaceLandmark;
-    - una FaceMesh valida.
+    - una FaceMesh minima valida.
     """
 
     detection = FaceDetection(
@@ -288,6 +329,11 @@ def build_face() -> Face:
             "non è 25."
         )
 
+    #
+    # Il Face di test contiene esattamente i 25
+    # landmark standard nell'ordine definito
+    # da create_standard_landmarks().
+    #
     face.landmarks = [
 
         FaceLandmark(
@@ -342,6 +388,31 @@ def main() -> None:
     )
 
     #
+    # Snapshot della Canonical Mesh.
+    #
+    # La Canonical Mesh originale non deve essere
+    # modificata dalla ricostruzione.
+    #
+
+    original_canonical_vertices = [
+        (
+            vertex.x,
+            vertex.y,
+            vertex.z,
+        )
+        for vertex in canonical_mesh.vertices
+    ]
+
+    original_canonical_triangles = [
+        (
+            triangle.a,
+            triangle.b,
+            triangle.c,
+        )
+        for triangle in canonical_mesh.triangles
+    ]
+
+    #
     # -----------------------------------------------------
     # 2. Canonical Mapping completo
     # -----------------------------------------------------
@@ -388,12 +459,22 @@ def main() -> None:
 
     #
     # -----------------------------------------------------
-    # 4. Snapshot della geometria del Face
+    # 4. Snapshot della FaceMesh iniziale
     # -----------------------------------------------------
     #
+    # La mesh iniziale è volutamente minima:
+    #
+    #     3 vertici
+    #     1 triangolo
+    #
+    # Questi valori NON sono gli output attesi della
+    # ricostruzione.
+    #
+    # Servono esclusivamente per dimostrare che la
+    # Pipeline riceve una FaceMesh valida iniziale.
+    #
 
-    original_vertices = [
-
+    original_face_vertices = [
         (
             vertex.x,
             vertex.y,
@@ -403,8 +484,7 @@ def main() -> None:
         for vertex in face.mesh.vertices
     ]
 
-    original_triangles = [
-
+    original_face_triangles = [
         (
             triangle.a,
             triangle.b,
@@ -414,11 +494,11 @@ def main() -> None:
         for triangle in face.mesh.triangles
     ]
 
-    original_vertex_count = (
+    original_face_vertex_count = (
         len(face.mesh.vertices)
     )
 
-    original_triangle_count = (
+    original_face_triangle_count = (
         len(face.mesh.triangles)
     )
 
@@ -438,6 +518,9 @@ def main() -> None:
     #     ↓
     # RegistrationEngine.register()
     #
+    # Il risultato simulato deve rispettare
+    # il contratto reale di RegistrationResult.
+    #
 
     registration_result = RegistrationResult(
         status=RegistrationStatus.SUCCESS,
@@ -449,6 +532,9 @@ def main() -> None:
         used_landmark_count=EXPECTED_CONTROL_POINTS,
         expected_landmark_count=EXPECTED_CONTROL_POINTS,
         registration_error=0.0,
+        transformation=(
+            RegistrationTransformation.identity()
+        ),
     )
 
     #
@@ -526,57 +612,132 @@ def main() -> None:
         )
 
     #
-    # La Pipeline costruisce internamente
-    # la Canonical Mesh e la conserva nella
-    # propria cache.
+    # -----------------------------------------------------
+    # 8.1 Verifica Canonical Mesh
+    # -----------------------------------------------------
     #
-    # Pertanto non confrontiamo l'identità
-    # con la Canonical Mesh costruita
-    # localmente dal test.
+    # La Pipeline può utilizzare una propria istanza
+    # della Canonical Mesh caricata tramite il proprio
+    # meccanismo di cache/template.
     #
-
-    if (
-        registered_mesh
-        is not HeadReconstructionPipeline._canonical_mesh
-    ):
-
-        raise AssertionError(
-            "La Canonical Mesh passata al "
-            "RegistrationEngine non è "
-            "quella costruita dalla Pipeline."
-        )
-
+    # Non verifichiamo quindi l'identità Python con:
     #
-    # Verifica della geometria della
-    # Canonical Mesh effettivamente passata
-    # al RegistrationEngine.
+    #     registered_mesh is canonical_mesh
+    #
+    # Verifichiamo invece che la mesh sia semanticamente
+    # equivalente a quella attesa.
     #
 
     if (
         len(registered_mesh.vertices)
-        != EXPECTED_VERTICES
+        != len(canonical_mesh.vertices)
     ):
 
         raise AssertionError(
-            "La Canonical Mesh passata al "
-            "RegistrationEngine contiene "
-            f"{len(registered_mesh.vertices)} "
-            f"vertici invece di "
-            f"{EXPECTED_VERTICES}."
+            "Il numero dei vertici della Canonical Mesh "
+            "passata al RegistrationEngine non coincide "
+            "con quello atteso."
         )
 
     if (
         len(registered_mesh.triangles)
-        != EXPECTED_TRIANGLES
+        != len(canonical_mesh.triangles)
     ):
 
         raise AssertionError(
-            "La Canonical Mesh passata al "
-            "RegistrationEngine contiene "
-            f"{len(registered_mesh.triangles)} "
-            f"triangoli invece di "
-            f"{EXPECTED_TRIANGLES}."
+            "Il numero dei triangoli della Canonical Mesh "
+            "passata al RegistrationEngine non coincide "
+            "con quello atteso."
         )
+
+    #
+    # Verifica geometria Canonical Mesh.
+    #
+
+    for index, (
+        registered_vertex,
+        expected_vertex,
+    ) in enumerate(
+        zip(
+            registered_mesh.vertices,
+            canonical_mesh.vertices,
+        )
+    ):
+
+        if (
+            registered_vertex.x != expected_vertex.x
+            or registered_vertex.y != expected_vertex.y
+            or registered_vertex.z != expected_vertex.z
+        ):
+
+            raise AssertionError(
+                "La geometria della Canonical Mesh "
+                f"differisce al vertice {index}."
+            )
+
+    #
+    # Verifica topologia Canonical Mesh.
+    #
+
+    for index, (
+        registered_triangle,
+        expected_triangle,
+    ) in enumerate(
+        zip(
+            registered_mesh.triangles,
+            canonical_mesh.triangles,
+        )
+    ):
+
+        if (
+            registered_triangle.a
+            != expected_triangle.a
+            or registered_triangle.b
+            != expected_triangle.b
+            or registered_triangle.c
+            != expected_triangle.c
+        ):
+
+            raise AssertionError(
+                "La topologia della Canonical Mesh "
+                f"differisce al triangolo {index}."
+            )
+
+    #
+    # Verifica identificativo logico.
+    #
+
+    if (
+        registered_mesh.canonical_mesh_id
+        != canonical_mesh.canonical_mesh_id
+    ):
+
+        raise AssertionError(
+            "Il canonical_mesh_id della Canonical Mesh "
+            "passata al RegistrationEngine non coincide "
+            "con quello atteso."
+        )
+
+    #
+    # Verifica template.
+    #
+
+    if (
+        registered_mesh.template_id
+        != canonical_mesh.template_id
+    ):
+
+        raise AssertionError(
+            "Il template_id della Canonical Mesh "
+            "passata al RegistrationEngine non coincide "
+            "con quello atteso."
+        )
+
+    #
+    # -----------------------------------------------------
+    # 8.2 Verifica Canonical Mapping
+    # -----------------------------------------------------
+    #
 
     if registered_mapping is not canonical_mapping:
 
@@ -619,6 +780,13 @@ def main() -> None:
             "inatteso."
         )
 
+    if registration_result.transformation is None:
+
+        raise AssertionError(
+            "La RegistrationTransformation "
+            "del risultato simulato è assente."
+        )
+
     #
     # -----------------------------------------------------
     # 10. Verifica Face restituito
@@ -635,12 +803,27 @@ def main() -> None:
 
     #
     # -----------------------------------------------------
-    # 11. Verifica geometria invariata
+    # 11. Verifica mesh ricostruita
     # -----------------------------------------------------
+    #
+    # La FaceMesh iniziale contiene:
+    #
+    #     3 vertici
+    #     1 triangolo
+    #
+    # La ricostruzione Sprint 26 sostituisce questa
+    # geometria con quella derivata dalla Canonical Mesh.
+    #
+    # Pertanto la mesh finale deve contenere:
+    #
+    #     1604 vertici
+    #     3064 triangoli
+    #
+    # La geometria può essere diversa dalla mesh iniziale
+    # e questo è il comportamento atteso.
     #
 
     final_vertices = [
-
         (
             vertex.x,
             vertex.y,
@@ -650,21 +833,7 @@ def main() -> None:
         for vertex in result_face.mesh.vertices
     ]
 
-    if final_vertices != original_vertices:
-
-        raise AssertionError(
-            "La geometria della FaceMesh "
-            "è stata modificata."
-        )
-
-    #
-    # -----------------------------------------------------
-    # 12. Verifica topologia invariata
-    # -----------------------------------------------------
-    #
-
     final_triangles = [
-
         (
             triangle.a,
             triangle.b,
@@ -674,37 +843,244 @@ def main() -> None:
         for triangle in result_face.mesh.triangles
     ]
 
-    if final_triangles != original_triangles:
-
-        raise AssertionError(
-            "La topologia della FaceMesh "
-            "è stata modificata."
-        )
-
     #
     # -----------------------------------------------------
-    # 13. Verifica conteggi
+    # 12. Numero vertici della mesh ricostruita
     # -----------------------------------------------------
     #
+
+    expected_vertex_count = (
+        len(canonical_mesh.vertices)
+    )
 
     if (
         len(result_face.mesh.vertices)
-        != original_vertex_count
+        != expected_vertex_count
     ):
 
         raise AssertionError(
             "Il numero dei vertici della "
-            "FaceMesh è cambiato."
+            "FaceMesh ricostruita non coincide "
+            "con quello della Canonical Mesh. "
+            f"Attesi: {expected_vertex_count}; "
+            f"ottenuti: "
+            f"{len(result_face.mesh.vertices)}."
         )
+
+    #
+    # -----------------------------------------------------
+    # 13. Numero triangoli della mesh ricostruita
+    # -----------------------------------------------------
+    #
+
+    expected_triangle_count = (
+        len(canonical_mesh.triangles)
+    )
 
     if (
         len(result_face.mesh.triangles)
-        != original_triangle_count
+        != expected_triangle_count
     ):
 
         raise AssertionError(
             "Il numero dei triangoli della "
-            "FaceMesh è cambiato."
+            "FaceMesh ricostruita non coincide "
+            "con quello della Canonical Mesh. "
+            f"Attesi: {expected_triangle_count}; "
+            f"ottenuti: "
+            f"{len(result_face.mesh.triangles)}."
+        )
+
+    #
+    # -----------------------------------------------------
+    # 14. Verifica coordinate finite
+    # -----------------------------------------------------
+    #
+
+    final_geometry = np.asarray(
+        final_vertices,
+        dtype=np.float64,
+    )
+
+    if final_geometry.shape != (
+        EXPECTED_VERTICES,
+        3,
+    ):
+
+        raise AssertionError(
+            "La geometria finale non ha "
+            "la forma attesa "
+            f"({EXPECTED_VERTICES}, 3). "
+            f"Forma ottenuta: "
+            f"{final_geometry.shape}."
+        )
+
+    if not np.all(
+        np.isfinite(final_geometry)
+    ):
+
+        raise AssertionError(
+            "La FaceMesh ricostruita contiene "
+            "coordinate non finite."
+        )
+
+    #
+    # -----------------------------------------------------
+    # 15. Verifica topologia
+    # -----------------------------------------------------
+    #
+    # La topologia finale deve coincidere con quella
+    # della Canonical Mesh.
+    #
+    # Non deve coincidere con la mesh minimale iniziale.
+    #
+
+    expected_triangles = [
+        (
+            triangle.a,
+            triangle.b,
+            triangle.c,
+        )
+
+        for triangle in canonical_mesh.triangles
+    ]
+
+    if final_triangles != expected_triangles:
+
+        raise AssertionError(
+            "La topologia della FaceMesh "
+            "ricostruita non coincide con "
+            "quella della Canonical Mesh."
+        )
+
+    #
+    # -----------------------------------------------------
+    # 16. Verifica indici triangoli
+    # -----------------------------------------------------
+    #
+
+    for index, triangle in enumerate(
+        result_face.mesh.triangles
+    ):
+
+        for vertex_index in (
+            triangle.a,
+            triangle.b,
+            triangle.c,
+        ):
+
+            if (
+                vertex_index < 0
+                or vertex_index >= expected_vertex_count
+            ):
+
+                raise AssertionError(
+                    "Il triangolo "
+                    f"{index} contiene un indice "
+                    f"vertice non valido: "
+                    f"{vertex_index}."
+                )
+
+    #
+    # -----------------------------------------------------
+    # 17. Verifica che la geometria sia effettivamente
+    #     presente.
+    # -----------------------------------------------------
+    #
+
+    if not final_vertices:
+
+        raise AssertionError(
+            "La FaceMesh ricostruita non contiene "
+            "vertici."
+        )
+
+    if not final_triangles:
+
+        raise AssertionError(
+            "La FaceMesh ricostruita non contiene "
+            "triangoli."
+        )
+
+    #
+    # -----------------------------------------------------
+    # 18. Verifica che la geometria iniziale sia stata
+    #     effettivamente sostituita dalla ricostruzione.
+    # -----------------------------------------------------
+    #
+    # Il test parte volutamente da una mesh minima:
+    #
+    #     3 vertici
+    #
+    # La ricostruzione deve produrre:
+    #
+    #     1604 vertici
+    #
+    # Non è quindi richiesta l'identità geometrica
+    # con la mesh iniziale.
+    #
+
+    if (
+        len(final_vertices)
+        == original_face_vertex_count
+        and final_triangles
+        == original_face_triangles
+    ):
+
+        raise AssertionError(
+            "La FaceMesh finale coincide ancora "
+            "con la mesh minima iniziale; "
+            "la ricostruzione non sembra essere "
+            "stata applicata."
+        )
+
+    #
+    # -----------------------------------------------------
+    # 19. Verifica integrità Canonical Mesh originale
+    # -----------------------------------------------------
+    #
+    # La ricostruzione non deve modificare la
+    # Canonical Mesh originale utilizzata dal test.
+    #
+
+    current_canonical_vertices = [
+        (
+            vertex.x,
+            vertex.y,
+            vertex.z,
+        )
+
+        for vertex in canonical_mesh.vertices
+    ]
+
+    current_canonical_triangles = [
+        (
+            triangle.a,
+            triangle.b,
+            triangle.c,
+        )
+
+        for triangle in canonical_mesh.triangles
+    ]
+
+    if (
+        current_canonical_vertices
+        != original_canonical_vertices
+    ):
+
+        raise AssertionError(
+            "La geometria della Canonical Mesh "
+            "originale è stata modificata."
+        )
+
+    if (
+        current_canonical_triangles
+        != original_canonical_triangles
+    ):
+
+        raise AssertionError(
+            "La topologia della Canonical Mesh "
+            "originale è stata modificata."
         )
 
     #
@@ -740,36 +1116,65 @@ def main() -> None:
     )
 
     print(
+        "Registration transformation: "
+        "True"
+    )
+
+    print(
         f"RegistrationEngine calls: "
         f"{register_mock.call_count}"
     )
 
+    print()
+
     print(
-        f"Canonical vertices passed: "
-        f"{len(registered_mesh.vertices)}"
+        "========== RECONSTRUCTED MESH =========="
     )
 
     print(
-        f"Canonical triangles passed: "
-        f"{len(registered_mesh.triangles)}"
+        f"Initial FaceMesh vertices: "
+        f"{original_face_vertex_count}"
     )
 
     print(
-        f"Face mesh vertices: "
-        f"{original_vertex_count}"
+        f"Reconstructed vertices: "
+        f"{len(result_face.mesh.vertices)}"
     )
 
     print(
-        f"Face mesh triangles: "
-        f"{original_triangle_count}"
+        f"Initial FaceMesh triangles: "
+        f"{original_face_triangle_count}"
     )
 
     print(
-        "Geometry unchanged: True"
+        f"Reconstructed triangles: "
+        f"{len(result_face.mesh.triangles)}"
     )
 
     print(
-        "Topology unchanged: True"
+        f"Expected vertices: "
+        f"{expected_vertex_count}"
+    )
+
+    print(
+        f"Expected triangles: "
+        f"{expected_triangle_count}"
+    )
+
+    print(
+        "Geometry finite: True"
+    )
+
+    print(
+        "Topology matches Canonical Mesh: True"
+    )
+
+    print(
+        "Canonical geometry unchanged: True"
+    )
+
+    print(
+        "Canonical topology unchanged: True"
     )
 
     print(

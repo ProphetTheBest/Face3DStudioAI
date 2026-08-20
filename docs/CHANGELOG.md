@@ -1081,3 +1081,426 @@ La pipeline è pronta per il successivo:
     Sprint 26 — Local Deformation
 
 La Local Deformation non viene anticipata nello Sprint 25.
+
+---
+
+## Sprint 26 — Local Deformation
+
+Data: 20/08/2026
+
+### Stato
+
+[x] Sprint 26 completato e verificato.
+
+### Obiettivo
+
+È stata completata l'implementazione della deformazione locale
+della Canonical Mesh dopo il Global Alignment.
+
+La pipeline raggiunta è:
+
+    Canonical Mesh
+          +
+    Real Face Landmarks
+          ↓
+    Registration Engine
+          ↓
+    Global Alignment
+          ↓
+    Aligned Canonical Mesh
+          ↓
+    Local Deformation
+          ↓
+    Personalized Mesh
+
+La topologia della Canonical Mesh viene preservata durante la
+deformazione.
+
+### LocalDeformationEngine
+
+È stato introdotto il componente:
+
+    source/reconstruction/algorithms/local_deformation.py
+
+Il motore riceve:
+
+- source control points;
+- target control points;
+- smoothing opzionale.
+
+Il componente espone:
+
+- `source_points`;
+- `target_points`;
+- `displacements`;
+- `displacement()`;
+- `deform()`;
+- `control_point_count`;
+- `smoothing`.
+
+### Algoritmo
+
+Per lo Sprint 26 è stata utilizzata una interpolazione RBF
+con kernel Thin Plate Spline tramite `scipy.interpolate.RBFInterpolator`.
+
+La scelta è stata validata sul dataset sintetico utilizzato
+durante lo sviluppo.
+
+La deformazione è calcolata a partire dagli spostamenti dei
+25 Control Points e viene propagata all'intera geometria.
+
+### Ambiente numerico verificato
+
+Sono state verificate le dipendenze disponibili nell'ambiente
+di sviluppo:
+
+    NumPy: 1.26.4
+    SciPy: 1.17.1
+
+È stata inoltre verificata la disponibilità di:
+
+    scipy.interpolate.RBFInterpolator
+
+con risultato:
+
+    RESULT: OK
+
+### Test dei Control Points
+
+È stato eseguito un test con 25 Control Points e deformazione
+artificiale nota.
+
+Risultati:
+
+    Control Points: 25
+    Source shape: (25, 3)
+    Target shape: (25, 3)
+    Displacement shape: (25, 3)
+    Smoothing: 0.0
+
+    Mean error:
+        3.203803786809599e-17
+
+    RMS error:
+        4.082882857376341e-17
+
+    Max error:
+        7.850462293418876e-17
+
+    RESULT: OK
+
+Il test conferma la corretta interpolazione dei Control Points.
+
+### Test dei punti intermedi
+
+È stata verificata la capacità del motore di deformare punti
+non coincidenti con i Control Points.
+
+Risultati:
+
+    Intermediate points: 5
+    Input shape: (5, 3)
+    Output shape: (5, 3)
+    Displacement shape: (5, 3)
+    Finite output: True
+    Finite displacement: True
+
+    Displacement norm:
+        [0.08719264 0.02798869 0.02809725
+         0.08715859 0.0252629 ]
+
+    RESULT: OK
+
+### Test sulla mesh completa
+
+Il motore è stato verificato su una geometria contenente:
+
+    1604 vertices
+    3064 triangles
+
+Risultati:
+
+    Control Points: 25
+    Original vertices: 1604
+    Deformed vertices: 1604
+
+    Shape unchanged: True
+    Vertex count unchanged: True
+    Input vertices unchanged: True
+    Source Control Points unchanged: True
+    Target Control Points unchanged: True
+    Finite output: True
+
+    Moved vertices:
+        1604 / 1604
+
+    Mean displacement:
+        0.09187980028230278
+
+    Max displacement:
+        0.13124467965624315
+
+    Control Point max error:
+        7.850462293418876e-17
+
+    RESULT: OK
+
+Il test conferma inoltre che il motore non modifica in-place
+né i vertici di input né i Control Points sorgente e destinazione.
+
+### Integrazione Global Alignment + Local Deformation
+
+È stato eseguito il test integrato:
+
+    test_global_alignment_local_deformation.py
+
+Sono stati verificati:
+
+    Canonical vertices: 1604
+    Canonical triangles: 3064
+    Canonical Control Points: 25
+    Real Control Points: 25
+    Mapping entries: 25
+    Mapping complete: True
+
+    Global Alignment:
+        Status: RegistrationStatus.SUCCESS
+        Success: True
+        Used landmarks: 25
+        Expected landmarks: 25
+        Transformation shape: (4, 4)
+
+    Aligned vertices: 1604
+    Aligned shape: (1604, 3)
+
+    Deformed vertices: 1604
+    Deformed shape: (1604, 3)
+
+    Control Points mean error:
+        1.0852430065710906e-16
+
+    Control Points RMS error:
+        1.3475753576563817e-16
+
+    Control Points max error:
+        3.3306690738754696e-16
+
+È stata verificata anche l'integrità della Canonical Mesh:
+
+    Canonical vertices unchanged: True
+    Canonical topology unchanged: True
+
+    RESULT: OK
+
+### HeadReconstructionBuilder
+
+La deformazione locale è stata integrata nel:
+
+    HeadReconstructionBuilder
+
+Versione verificata:
+
+    3.0.1
+
+Il builder produce una FaceMesh con:
+
+    Vertices: 1604
+    Triangles: 3064
+    Shape: (1604, 3)
+
+Sono risultati verificati:
+
+    Finite geometry: True
+    Vertex count OK: True
+    Triangle count OK: True
+    Shape OK: True
+    Geometry changed: True
+    Topology unchanged: True
+    Canonical vertices unchanged: True
+    Canonical topology unchanged: True
+
+    RESULT: OK
+
+### HeadReconstructionPipeline
+
+La Local Deformation è stata verificata anche attraverso:
+
+    HeadReconstructionPipeline
+
+La pipeline ha prodotto:
+
+    FaceMesh created: True
+    Vertices: 1604
+    Triangles: 3064
+    Shape: (1604, 3)
+    Finite geometry: True
+    Triangle indices valid: True
+    Boundary phase completed: True
+    Geometry non-degenerate: True
+
+Il test ha inoltre confermato:
+
+    Returned same Face: True
+    Pipeline completed: True
+
+    RESULT: OK
+
+### Regression Test della Registration Engine
+
+Dopo l'integrazione della Local Deformation è stato rieseguito
+il test:
+
+    test_reconstruction_registration.py
+
+Il test ha confermato:
+
+    Registration status: RegistrationStatus.SUCCESS
+    Registration success: True
+    Used landmarks: 25
+    Expected landmarks: 25
+    Registration transformation: True
+    RegistrationEngine calls: 1
+
+La ricostruzione finale mantiene:
+
+    Initial FaceMesh vertices: 3
+    Reconstructed vertices: 1604
+
+    Initial FaceMesh triangles: 1
+    Reconstructed triangles: 3064
+
+    Expected vertices: 1604
+    Expected triangles: 3064
+
+    Geometry finite: True
+    Topology matches Canonical Mesh: True
+    Canonical geometry unchanged: True
+    Canonical topology unchanged: True
+
+    RESULT: OK
+
+### Regression Test Global Alignment
+
+È stato inoltre rieseguito:
+
+    test_global_alignment.py
+
+Risultati:
+
+    Status: RegistrationStatus.SUCCESS
+    Success: True
+    Used landmarks: 25
+    Expected landmarks: 25
+
+    Registration error:
+        2.936915022422793e-16
+
+    Mean error:
+        2.739988667247874e-16
+
+    RMS error:
+        2.936915022422793e-16
+
+    Max error:
+        5.23691153334427e-16
+
+    Errors: []
+    Warnings: []
+
+    Expected scale: 1.35
+    Recovered scale: 1.35
+    Scale error: 0.0
+
+    Translation error:
+        5.967448757360216e-16
+
+    Rotation error:
+        5.599433397402341e-16
+
+    RESULT: OK
+
+### Regression Test Head Reconstruction Builder
+
+È stato rieseguito:
+
+    test_head_reconstruction_builder.py
+
+Risultato:
+
+    FaceMesh created: True
+    1604 vertices: True
+    3064 triangles: True
+    Geometry shape: True
+    Finite geometry: True
+    Geometry deformed: True
+    Topology unchanged: True
+    Canonical geometry unchanged: True
+    Canonical topology unchanged: True
+
+    RESULT: OK
+
+### Regression Test Head Reconstruction Pipeline
+
+È stato rieseguito:
+
+    test_head_reconstruction_pipeline.py
+
+Risultato:
+
+    Pipeline completed: True
+    FaceMesh created: True
+    1604 vertices: True
+    3064 triangles: True
+    Finite geometry: True
+    Triangle indices valid: True
+    Boundary phase: True
+    Geometry non-degenerate: True
+
+    RESULT: OK
+
+### Proprietà preservate
+
+Lo Sprint 26 mantiene invariati:
+
+- numero dei vertici;
+- numero dei triangoli;
+- indici dei triangoli;
+- topologia;
+- identità dei vertici;
+- Canonical Mesh originale.
+
+La deformazione modifica esclusivamente le coordinate della
+geometria derivata.
+
+### File introdotti o modificati
+
+È stato introdotto:
+
+    source/reconstruction/algorithms/local_deformation.py
+
+Sono stati integrati/modificati i componenti necessari alla
+ricostruzione locale e ai relativi test.
+
+### Risultato finale
+
+    SPRINT 26 — COMPLETATO E VERIFICATO
+
+Il progetto dispone ora di una pipeline verificata:
+
+    Registration
+        ↓
+    Global Alignment
+        ↓
+    Local Deformation
+        ↓
+    Personalized FaceMesh
+
+con 1604 vertici e 3064 triangoli e preservazione della
+topologia canonica.
+
+Il prossimo obiettivo è:
+
+    Sprint 27 — Head Reconstruction
+
+La Local Deformation non viene ulteriormente estesa nello
+Sprint 26 oltre le verifiche già completate.
