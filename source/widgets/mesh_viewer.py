@@ -8,7 +8,7 @@ Autore:
 Marco Cantù
 
 Versione:
-3.3.0
+3.4.0
 ==========================================================
 """
 
@@ -38,6 +38,8 @@ from PySide6.QtCore import (
     Signal,
 )
 
+from PySide6.QtGui import QVector3D
+
 from source.models.face_mesh import FaceMesh
 
 
@@ -54,24 +56,27 @@ from source.models.face_mesh import FaceMesh
 # uses a soft camera-relative key + fill light and a much
 # stronger ambient component.
 #
-_FACE_INSPECTION_SHADER = None
-
-
-def _get_face_inspection_shader():
+def _create_face_inspection_shader():
     """
-    Return the custom face-inspection shader.
+    Crea il custom shader per l'ispezione del volto.
 
-    The shader is intentionally small and self-contained.
-    It uses exactly the attributes/uniforms expected by
-    GLMeshItem in PyQtGraph 0.14.0.
+    Il programma OpenGL NON viene mantenuto in una variabile globale.
+    Ogni MeshViewer possiede infatti il proprio ShaderProgram, creato
+    nel contesto OpenGL del relativo GLViewWidget.
+
+    Questo è importante perché un program OpenGL appartiene al contesto
+    che lo ha creato: riutilizzare globalmente l'identificativo del
+    programma tra GLViewWidget distinti può produrre:
+
+        GL_INVALID_VALUE (1281)
+        glGetAttribLocation(program, ...)
+
+    quando il secondo viewer tenta di usare un program creato in un
+    contesto differente o non più valido.
     """
 
-    global _FACE_INSPECTION_SHADER
-
-    if _FACE_INSPECTION_SHADER is None:
-
-        _FACE_INSPECTION_SHADER = (
-            gl_shaders.ShaderProgram(
+    return (
+        gl_shaders.ShaderProgram(
                 "faceInspectionShaded",
                 [
                     gl_shaders.VertexShader(
@@ -189,8 +194,6 @@ def _get_face_inspection_shader():
             )
         )
 
-    return _FACE_INSPECTION_SHADER
-
 
 class MeshViewer(QWidget):
     """
@@ -208,6 +211,10 @@ class MeshViewer(QWidget):
     """
 
     viewport_clicked = Signal(int, int)
+
+    # Stato completo della camera per la sincronizzazione
+    # tra due MeshViewer affiancati.
+    camera_changed = Signal(object)
 
     MODE_POINTS = 0
     MODE_WIREFRAME = 1
@@ -240,6 +247,15 @@ class MeshViewer(QWidget):
         self._configure_toolbar_buttons()
 
         #
+        # Camera synchronization
+        #
+        # Deve essere inizializzato PRIMA di creare il GLViewWidget,
+        # perché _create_gl_view() esegue reset_camera() e quindi
+        # può emettere immediatamente camera_changed.
+        #
+        self._camera_syncing = False
+
+        #
         # OpenGL Viewer
         #
 
@@ -264,6 +280,11 @@ class MeshViewer(QWidget):
         self._points_item = None
         self._mesh_item = None
         self._wireframe_item = None
+
+        # Shader OpenGL appartenente a questo MeshViewer.
+        # Non deve essere condiviso globalmente tra GLViewWidget
+        # differenti perché il program è legato al relativo contesto.
+        self._face_inspection_shader = None
 
         #
         # Selected vertex marker
@@ -636,6 +657,98 @@ class MeshViewer(QWidget):
             lambda: self.set_render_mode(
                 self.MODE_MESH
             )
+        )
+
+    # ---------------------------------------------------------
+    # Camera synchronization
+    # ---------------------------------------------------------
+
+    def camera_state(self):
+        """
+        Restituisce lo stato corrente della camera.
+        """
+
+        center = self._view.opts["center"]
+
+        return {
+            "center": (
+                float(center.x()),
+                float(center.y()),
+                float(center.z()),
+            ),
+            "distance": float(self._view.opts["distance"]),
+            "elevation": float(self._view.opts["elevation"]),
+            "azimuth": float(self._view.opts["azimuth"]),
+        }
+
+    # ---------------------------------------------------------
+
+    def apply_camera_state(self, state):
+        """
+        Applica uno stato camera proveniente dall'altro viewer.
+
+        È una funzione esclusivamente visuale: non modifica
+        mesh, vertici o topologia.
+        """
+
+        if not state:
+            return
+
+        center = state.get("center")
+
+        if center is None or len(center) != 3:
+            return
+
+        self._camera_syncing = True
+
+        try:
+            self._view.opts["center"] = QVector3D(
+                float(center[0]),
+                float(center[1]),
+                float(center[2]),
+            )
+
+            self._view.setCameraPosition(
+                distance=float(
+                    state.get(
+                        "distance",
+                        self._view.opts["distance"],
+                    )
+                ),
+                elevation=float(
+                    state.get(
+                        "elevation",
+                        self._view.opts["elevation"],
+                    )
+                ),
+                azimuth=float(
+                    state.get(
+                        "azimuth",
+                        self._view.opts["azimuth"],
+                    )
+                ),
+            )
+
+            self._view.update()
+
+        finally:
+            self._camera_syncing = False
+
+    # ---------------------------------------------------------
+
+    def _emit_camera_changed(self):
+        """
+        Emette lo stato camera corrente.
+
+        Le emissioni provenienti da apply_camera_state() sono
+        bloccate per evitare loop tra i due viewer.
+        """
+
+        if self._camera_syncing:
+            return
+
+        self.camera_changed.emit(
+            self.camera_state()
         )
 
     # ---------------------------------------------------------
@@ -1061,6 +1174,8 @@ class MeshViewer(QWidget):
             azimuth=0,
         )
 
+        self._emit_camera_changed()
+
     # ---------------------------------------------------------
 
     def set_left_view(self):
@@ -1070,6 +1185,8 @@ class MeshViewer(QWidget):
             elevation=0,
             azimuth=90,
         )
+
+        self._emit_camera_changed()
 
     # ---------------------------------------------------------
 
@@ -1081,6 +1198,8 @@ class MeshViewer(QWidget):
             azimuth=-90,
         )
 
+        self._emit_camera_changed()
+
     # ---------------------------------------------------------
 
     def set_top_view(self):
@@ -1090,6 +1209,8 @@ class MeshViewer(QWidget):
             elevation=90,
             azimuth=0,
         )
+
+        self._emit_camera_changed()
 
     # ---------------------------------------------------------
 
@@ -1101,9 +1222,26 @@ class MeshViewer(QWidget):
             azimuth=45,
         )
 
+        self._emit_camera_changed()
+
     # ---------------------------------------------------------
     # Rendering
     # ---------------------------------------------------------
+
+    def _get_face_inspection_shader(self):
+        """
+        Restituisce lo shader appartenente a questo MeshViewer.
+
+        Il programma viene creato lazy, cioè al primo rendering della
+        mesh, quando il GLViewWidget ha già il proprio contesto OpenGL.
+        """
+
+        if self._face_inspection_shader is None:
+            self._face_inspection_shader = (
+                _create_face_inspection_shader()
+            )
+
+        return self._face_inspection_shader
 
     def show_mesh(
         self,
@@ -1256,7 +1394,7 @@ class MeshViewer(QWidget):
                         smooth=True,
                         drawFaces=True,
                         drawEdges=False,
-                        shader=_get_face_inspection_shader(),
+                        shader=self._get_face_inspection_shader(),
                     )
                 )
 
@@ -1448,6 +1586,8 @@ class MeshViewer(QWidget):
                 relative="view",
             )
 
+            self._emit_camera_changed()
+
             event.accept()
 
             return
@@ -1477,6 +1617,8 @@ class MeshViewer(QWidget):
             self._view,
             event,
         )
+
+        self._emit_camera_changed()
 
     # ---------------------------------------------------------
 
@@ -1537,6 +1679,8 @@ class MeshViewer(QWidget):
             self._view,
             event,
         )
+
+        self._emit_camera_changed()
 
         #
         # Reset stato click/rotazione.

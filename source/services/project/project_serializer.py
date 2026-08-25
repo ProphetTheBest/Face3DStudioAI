@@ -7,13 +7,14 @@ Project Serializer
 Responsabilità:
 - convertire un Project in un dizionario serializzabile;
 - serializzare gli Asset del progetto;
+- serializzare l'identità del Canonical Asset;
 - serializzare il Canonical Mapping, quando presente.
 
 Autore:
 Marco Cantù
 
 Versione:
-1.2.0
+1.3.0
 ==========================================================
 """
 
@@ -50,6 +51,32 @@ class ProjectSerializer:
                     project
                 )
             ),
+            "subjects": (
+                ProjectSerializer._serialize_subjects(project)
+            ),
+
+            #
+            # Identità del Canonical Asset utilizzato
+            # dal progetto.
+            #
+            # Il contenuto dell'asset non viene duplicato
+            # nel project.json.
+            #
+
+            "canonical_asset_id": (
+                project.canonical_asset_id
+            ),
+
+            "canonical_asset_type": (
+                project.canonical_asset_type
+            ),
+
+            #
+            # Mantenuto temporaneamente per compatibilità
+            # con i progetti e il flusso di authoring
+            # esistenti.
+            #
+
             "canonical_mapping": (
                 ProjectSerializer._serialize_canonical_mapping(
                     project
@@ -108,6 +135,25 @@ class ProjectSerializer:
 
         return assets
 
+
+    # ---------------------------------------------------------
+    # Reconstruction Subjects
+    # ---------------------------------------------------------
+
+    @staticmethod
+    def _serialize_subjects(project: Project) -> list:
+        return [
+            {
+                "subject_id": subject.subject_id,
+                "name": subject.name,
+                "source_asset_ids": list(subject.source_asset_ids),
+                "canonical_asset_id": subject.canonical_asset_id,
+                "canonical_asset_type": subject.canonical_asset_type,
+                "canonical_asset_version": subject.canonical_asset_version,
+            }
+            for subject in project.subjects
+        ]
+
     # ---------------------------------------------------------
     # Canonical Mapping
     # ---------------------------------------------------------
@@ -124,6 +170,17 @@ class ProjectSerializer:
 
         Il metodo delega la conversione del modello
         CanonicalMapping al suo metodo to_dict().
+
+        Notes
+        -----
+        Il Canonical Mapping viene ancora serializzato
+        temporaneamente per garantire la compatibilità
+        con i progetti esistenti e con il flusso di
+        authoring del Vertex Mapper.
+
+        Il nuovo runtime utilizzerà invece
+        canonical_asset_id per individuare il
+        Canonical Asset nella Canonical Asset Library.
         """
 
         if not project.has_canonical_mapping():

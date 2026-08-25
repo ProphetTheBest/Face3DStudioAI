@@ -1504,3 +1504,182 @@ Il prossimo obiettivo è:
 
 La Local Deformation non viene ulteriormente estesa nello
 Sprint 26 oltre le verifiche già completate.
+
+---
+
+## Milestone post-Sprint 26 — Project / Subject / Canonical Asset
+
+Data: 25/08/2026
+
+### Stato
+
+[x] Stabilizzazione completata e verificata.
+
+### Architettura
+
+È stata consolidata la gestione delle elaborazioni tramite
+`ReconstructionSubject`.
+
+Il Project rimane il contenitore generale, mentre ogni Subject
+rappresenta una specifica persona/elaborazione e mantiene
+l'associazione alla propria Canonical Asset.
+
+La struttura concettuale è:
+
+    Project
+       ↓
+    ReconstructionSubject
+       ├── source assets / fotografie
+       └── Canonical Asset
+
+Questo permette di mantenere nello stesso Project più soggetti
+con Canonical Asset differenti.
+
+### Canonical Asset Library
+
+È stata integrata la selezione della Canonical Asset
+durante la creazione di una nuova ricostruzione.
+
+Il dialogo di nuova ricostruzione:
+
+- carica le Canonical Asset disponibili;
+- permette la selezione dell'asset;
+- utilizza un asset di default se disponibile;
+- conserva ID, tipo e versione dell'asset;
+- permette di ricostruire l'associazione alla riapertura del Project.
+
+### Persistenza
+
+La relazione Subject → Canonical Asset viene serializzata
+e ricostruita dal Project Loader.
+
+Sono state verificate:
+
+- creazione di una nuova ricostruzione;
+- selezione della Canonical Asset;
+- associazione al Subject;
+- presenza delle fotografie del Subject;
+- salvataggio del Project;
+- chiusura dell'applicazione;
+- riapertura del Project;
+- conservazione dell'associazione;
+- visualizzazione dell'associazione nel Project Panel;
+- riapertura del Vertex Mapper;
+- mantenimento del Canonical Mapping 25/25.
+
+### Compatibilità
+
+La modifica non altera il contratto geometrico esistente.
+
+Restano invariati:
+
+- Canonical Mesh;
+- Canonical Mapping;
+- Registration Engine;
+- Global Alignment;
+- Local Deformation;
+- topologia;
+- identità dei vertici.
+
+---
+
+## CONGELAMENTO — BASELINE 25/08/2026
+
+Il progetto viene congelato nello stato corrente come baseline
+prima dello Sprint 27.
+
+La baseline comprende:
+
+    Project
+       ↓
+    Subjects
+       ↓
+    Source Photos
+       +
+    Canonical Asset associata
+       ↓
+    Canonical Mapping 25/25
+       ↓
+    Registration
+       ↓
+    Global Alignment
+       ↓
+    Local Deformation
+       ↓
+    Personalized Mesh
+
+Le migliorie residue dell'interfaccia utente non vengono affrontate
+in questa milestone e saranno riprese successivamente senza
+alterare l'architettura stabilizzata.
+
+---
+
+## Sprint 27 — DEVIAZIONE TECNICA
+
+La roadmap originaria prevedeva Head Reconstruction.
+
+Prima di procedere con la ricostruzione della testa completa,
+è stata identificata una priorità geometrica:
+
+    MediaPipe Face Surface
+             ↕
+    MakeHuman Canonical Face
+
+La mesh MediaPipe viene mantenuta come riferimento facciale
+geometrico.
+
+La Canonical Mesh deve mantenere topologia e identità dei vertici,
+adattando la propria geometria alla superficie facciale osservata.
+
+Lo Sprint 27 viene quindi riallineato temporaneamente alla
+correzione della geometria MediaPipe ↔ Canonical Mesh.
+
+La Head Reconstruction viene posticipata fino alla stabilizzazione
+di questo passaggio.
+
+---
+
+## Pulizia dei test sperimentali
+
+I test utilizzati durante l'esplorazione della soluzione geometrica
+sono stati classificati come diagnostici temporanei.
+
+I seguenti file non fanno parte della baseline definitiva
+e possono essere eliminati dal repository:
+
+- test_mediapipe_to_canonical_surface_transfer.py
+- test_mediapipe_to_canonical_surface_transfer_v2.py
+- test_mediapipe_to_canonical_surface_transfer_v3.py
+- test_mediapipe_to_canonical_surface_transfer_v4.py
+- test_mediapipe_to_canonical_surface_transfer_v5.py
+- test_mediapipe_to_canonical_surface_transfer_v6.py
+- test_mediapipe_to_canonical_surface_transfer_v7.py
+- test_mediapipe_canonical_face_surface_alignment.py
+- test_mediapipe_canonical_surface_projection.py
+- test_tps_components.py
+- test_tps_displacement_field.py
+- test_tps_distance_analysis.py
+- test_tps_gaussian_influence_radius.py
+- test_tps_influence_field.py
+- test_tps_influence_radius.py
+- test_tps_main_component.py
+- test_real_local_deformation_sigma02.py
+
+Questi test hanno avuto valore durante la ricerca e la diagnosi,
+ma non rappresentano codice di produzione né una suite stabile
+di regressione della baseline.
+
+I test strutturali e di integrazione relativi a Canonical Asset,
+Canonical Mapping, Registration, Global Alignment, Local Deformation
+e Project/Canonical Asset vengono invece mantenuti.
+
+---
+
+## Stato finale della baseline
+
+    BASELINE: 25/08/2026
+    SPRINT 26: COMPLETATO
+    ARCHITETTURA PROJECT/SUBJECT/CANONICAL ASSET: VERIFICATA
+    CANONICAL MAPPING: 25/25 COMPLETE
+    REGRESSIONI NOTE: NESSUNA
+    SPRINT 27: DEVIAZIONE TECNICA PIANIFICATA

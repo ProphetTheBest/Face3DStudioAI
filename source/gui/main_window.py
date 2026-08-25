@@ -30,6 +30,7 @@ from source.controllers.diagnostics.diagnostics_controller import (
     DiagnosticsController,
 )
 from source.dialogs.new_project_dialog import NewProjectDialog
+from source.dialogs.new_reconstruction_dialog import NewReconstructionDialog
 from source.dialogs.vertex_mapper_dialog import (
     VertexMapperDialog,
 )
@@ -77,6 +78,7 @@ class MainWindow(QMainWindow):
         file_menu = menu_bar.addMenu("&File")
 
         self.action_new_project = QAction("New Project...", self)
+        self.action_new_reconstruction = QAction("New Reconstruction...", self)
         self.action_open_project = QAction("Open Project...", self)
         self.action_import_photos = QAction("Import Photos...", self)
         self.action_export_obj = QAction("Export OBJ...", self)
@@ -96,6 +98,7 @@ class MainWindow(QMainWindow):
         self.action_exit = QAction("Exit", self)
 
         file_menu.addAction(self.action_new_project)
+        file_menu.addAction(self.action_new_reconstruction)
         file_menu.addAction(self.action_open_project)
 
         file_menu.addSeparator()
@@ -115,6 +118,10 @@ class MainWindow(QMainWindow):
 
         self.action_new_project.triggered.connect(
             self._on_new_project
+        )
+
+        self.action_new_reconstruction.triggered.connect(
+            self._on_new_reconstruction
         )
 
         self.action_open_project.triggered.connect(
@@ -261,6 +268,90 @@ class MainWindow(QMainWindow):
                 str(e)
             )
 
+            raise
+
+    # -----------------------------------------------------
+
+    def _on_new_reconstruction(self) -> None:
+        """
+        Crea una nuova elaborazione/Subject nel progetto corrente.
+        La Canonical viene scelta dalla Canonical Asset Library e
+        appartiene alla singola elaborazione, non al Project globale.
+        """
+
+        project_controller = (
+            self.app_controller.get_project_controller()
+        )
+
+        project = project_controller.get_project()
+
+        if project is None:
+            QMessageBox.warning(
+                self,
+                "New Reconstruction",
+                "Create or open a project before creating a reconstruction.",
+            )
+            return
+
+        if not project.assets:
+            QMessageBox.warning(
+                self,
+                "New Reconstruction",
+                "Import at least one photo before creating a reconstruction.",
+            )
+            return
+
+        dialog = NewReconstructionDialog(
+            project,
+            self,
+        )
+
+        if dialog.exec() != QDialog.Accepted:
+            return
+
+        try:
+            subject = project_controller.create_reconstruction(
+                dialog.subject_name(),
+                dialog.source_asset_id(),
+                dialog.canonical_asset_id(),
+                dialog.canonical_asset_type(),
+                dialog.canonical_asset_version(),
+            )
+
+            self._reset_vertex_mapper_dialog()
+
+            self.central_widget.project_panel.refresh()
+
+            # Il Controller ha impostato Subject e fotografia correnti.
+            # Aggiorniamo immediatamente i pannelli per mantenere il
+            # comportamento precedente dopo la creazione della
+            # Reconstruction.
+            self.central_widget.viewer_panel.show_current_asset()
+            self.central_widget.properties_panel.show_asset(
+                project_controller.get_current_asset()
+            )
+
+            self.status_bar.showMessage(
+                f"Reconstruction '{subject.name}' created.",
+                3000,
+            )
+
+            QMessageBox.information(
+                self,
+                "New Reconstruction",
+                (
+                    f"Reconstruction created successfully.\n\n"
+                    f"Subject: {subject.name}\n"
+                    f"Canonical: {subject.canonical_asset_id}"
+                ),
+            )
+
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                "New Reconstruction",
+                str(e),
+            )
             raise
 
     # -----------------------------------------------------
@@ -525,9 +616,23 @@ class MainWindow(QMainWindow):
         stesso progetto.
         """
 
-        canonical_mapping = (
-            self._get_or_create_canonical_mapping()
+        project_controller = (
+            self.app_controller.get_project_controller()
         )
+
+        current_subject = project_controller.get_current_subject()
+
+        if current_subject is not None:
+            canonical_asset = project_controller.get_canonical_asset()
+            canonical_mapping = (
+                canonical_asset.canonical_mapping
+                if canonical_asset is not None
+                else None
+            )
+        else:
+            canonical_mapping = (
+                self._get_or_create_canonical_mapping()
+            )
 
         if canonical_mapping is None:
 
@@ -545,6 +650,7 @@ class MainWindow(QMainWindow):
             self._vertex_mapper_dialog = (
                 VertexMapperDialog(
                     mapping_collection=canonical_mapping,
+                    controller=project_controller,
                     parent=self,
                 )
             )

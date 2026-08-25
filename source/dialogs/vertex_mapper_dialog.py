@@ -18,7 +18,7 @@ Autore:
 Marco Cantù
 
 Versione:
-1.8.0
+1.8.2
 ==========================================================
 """
 
@@ -29,10 +29,16 @@ from PySide6.QtWidgets import (
     QGridLayout,
     QHBoxLayout,
     QLabel,
+    QScrollArea,
+    QSizePolicy,
+    QWidget,
     QPushButton,
+    QMessageBox,
     QTextEdit,
     QVBoxLayout,
 )
+
+from pathlib import Path
 
 from PySide6.QtCore import QTimer
 
@@ -44,6 +50,22 @@ from source.mesh.mesh_picker import (
 
 from source.reconstruction.loaders.template_loader import (
     TemplateLoader,
+)
+
+from source.reconstruction.builders.canonical_mesh_builder import (
+    CanonicalMeshBuilder,
+)
+
+from source.reconstruction.builders.canonical_asset_builder import (
+    CanonicalAssetBuilder,
+)
+
+from source.services.canonical.canonical_asset_loader import (
+    CanonicalAssetLoader,
+)
+
+from source.services.canonical.canonical_asset_repository import (
+    CanonicalAssetRepository,
 )
 
 from source.models.geometry.vertex3d import (
@@ -95,10 +117,13 @@ class VertexMapperDialog(QDialog):
     def __init__(
         self,
         mapping_collection=None,
+        controller=None,
         parent=None,
     ):
 
         super().__init__(parent)
+
+        self._controller = controller
 
         # -----------------------------------------------------
         # Finestra
@@ -108,9 +133,18 @@ class VertexMapperDialog(QDialog):
             "Face3D Studio - Vertex Mapper"
         )
 
+        #
+        # La finestra non viene più resa volutamente enorme: su
+        # monitor con area verticale ridotta una finestra da 950 px
+        # taglia la parte inferiore del Vertex Mapper.
+        #
+        # Il contenuto è ora contenuto in una QScrollArea, quindi
+        # l'interfaccia resta completamente accessibile anche quando
+        # l'altezza disponibile non è sufficiente.
+        #
         self.resize(
             1100,
-            800,
+            850,
         )
 
         self.setMinimumSize(
@@ -186,8 +220,48 @@ class VertexMapperDialog(QDialog):
         # Layout principale
         # -----------------------------------------------------
 
-        layout = QVBoxLayout(
+        #
+        # Contenitore esterno.
+        #
+        # Il Vertex Mapper contiene molti controlli oltre al
+        # viewport OpenGL. La QScrollArea evita che la parte bassa
+        # della finestra venga semplicemente tagliata quando il
+        # monitor non dispone di sufficiente altezza verticale.
+        #
+        outer_layout = QVBoxLayout(
             self
+        )
+
+        outer_layout.setContentsMargins(
+            0,
+            0,
+            0,
+            0,
+        )
+
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setFrameShape(QScrollArea.NoFrame)
+
+        content_widget = QWidget()
+
+        layout = QVBoxLayout(
+            content_widget
+        )
+
+        layout.setContentsMargins(
+            14,
+            10,
+            14,
+            14,
+        )
+
+        scroll_area.setWidget(
+            content_widget
+        )
+
+        outer_layout.addWidget(
+            scroll_area
         )
 
         # -----------------------------------------------------
@@ -378,6 +452,59 @@ class VertexMapperDialog(QDialog):
         )
 
         # -----------------------------------------------------
+        # Informazioni Canonical Asset
+        # -----------------------------------------------------
+        #
+        # Mostriamo esplicitamente l'asset canonico effettivamente
+        # utilizzato dal Vertex Mapper. Questo è importante perché
+        # ogni ReconstructionSubject può avere una Canonical Mesh
+        # differente.
+        #
+        canonical_info_box = QGroupBox(
+            "Canonical Asset associato"
+        )
+
+        canonical_info_layout = QGridLayout(
+            canonical_info_box
+        )
+
+        self._canonical_info_id = QLabel("—")
+        self._canonical_info_name = QLabel("—")
+        self._canonical_info_type = QLabel("—")
+        self._canonical_info_version = QLabel("—")
+        self._canonical_info_mesh = QLabel("—")
+        self._canonical_info_mapping = QLabel("—")
+
+        canonical_rows = [
+            ("Asset ID:", self._canonical_info_id),
+            ("Nome:", self._canonical_info_name),
+            ("Tipo:", self._canonical_info_type),
+            ("Versione:", self._canonical_info_version),
+            ("Mesh:", self._canonical_info_mesh),
+            ("Mapping:", self._canonical_info_mapping),
+        ]
+
+        for row, (label, value) in enumerate(
+            canonical_rows
+        ):
+            canonical_info_layout.addWidget(
+                QLabel(label),
+                row,
+                0,
+            )
+            canonical_info_layout.addWidget(
+                value,
+                row,
+                1,
+            )
+
+        layout.addWidget(
+            canonical_info_box
+        )
+
+        self._refresh_canonical_asset_info()
+
+        # -----------------------------------------------------
         # Mesh Viewer
         # -----------------------------------------------------
 
@@ -385,26 +512,140 @@ class VertexMapperDialog(QDialog):
             show_guides=False
         )
 
+        #
+        # Il GLViewWidget interno non ha un'altezza minima sufficiente
+        # quando il dialog contiene molti controlli verticali.
+        #
+        # Senza questo vincolo il QVBoxLayout può comprimere il viewer
+        # fino a renderlo praticamente invisibile, lasciando visibili
+        # solo i controlli che lo precedono e lo seguono.
+        #
+        # Il valore è volutamente contenuto: serve a garantire sempre
+        # una superficie OpenGL utilizzabile senza ridisegnare la GUI.
+        #
+        #
+        # Il MeshViewer contiene a sua volta:
+        #
+        #   - toolbar View
+        #   - toolbar Render
+        #   - GLViewWidget
+        #
+        # Lasciarlo completamente elastico dentro il QVBoxLayout
+        # può produrre, in presenza di molti controlli, una geometria
+        # interna incoerente del GLViewWidget e la sovrapposizione
+        # visiva dei controlli successivi.
+        #
+        # Per questo il Vertex Mapper gli assegna una dimensione
+        # verticale stabile. Il contenuto complessivo della finestra
+        # rimane comunque scorrevole grazie alla QScrollArea.
+        #
+        self.mesh_viewer.setSizePolicy(
+            QSizePolicy.Expanding,
+            QSizePolicy.Fixed,
+        )
+
+        self.mesh_viewer.setFixedHeight(
+            380
+        )
+
         self.mesh_viewer.viewport_clicked.connect(
             self._on_viewport_clicked
         )
 
         layout.addWidget(
-            self.mesh_viewer,
-            1,
+            self.mesh_viewer
         )
 
         # -----------------------------------------------------
-        # Load template
+        # Load Canonical Asset
         # -----------------------------------------------------
+        #
+        # Il Vertex Mapper lavora sulla geometria canonica
+        # effettivamente registrata nella Canonical Asset Library.
+        # Non deve ricostruire o caricare direttamente il vecchio
+        # template MakeHuman durante l'uso normale.
+        #
+        # Il TemplateLoader rimane utilizzato esclusivamente nella
+        # fase di authoring/generazione del Canonical Asset, più avanti
+        # nel metodo _on_generate_canonical_asset().
+        #
 
-        template = TemplateLoader.load(
-            "male1591",
-            "head",
-        )
+        #
+        # Prima risolviamo il Canonical Asset attraverso il
+        # ProjectController. Questo è fondamentale per la nuova
+        # architettura:
+        #
+        #     foto
+        #       ↓
+        #     Subject corrente
+        #       ↓
+        #     Canonical Asset associato
+        #
+        # Non dobbiamo più assumere che il progetto utilizzi
+        # necessariamente male1591_head.
+        #
+        canonical_asset = None
+
+        if self._controller is not None:
+            try:
+                canonical_asset = (
+                    self._controller.get_canonical_asset()
+                )
+            except Exception as error:
+                QMessageBox.critical(
+                    self,
+                    "Canonical Asset",
+                    "Impossibile caricare il Canonical Asset "
+                    "associato al contesto corrente.\n\n"
+                    f"Errore: {error}",
+                )
+                return
+
+        #
+        # Fallback esclusivamente per compatibilità con il
+        # flusso legacy/authoring.
+        #
+        if canonical_asset is None:
+            canonical_asset_id = getattr(
+                self.mapping_collection,
+                "canonical_mesh_id",
+                "makehuman_male1591_head",
+            )
+
+            try:
+                canonical_asset = CanonicalAssetLoader.load(
+                    canonical_asset_id,
+                    "HEAD",
+                )
+            except Exception as error:
+                QMessageBox.critical(
+                    self,
+                    "Canonical Asset",
+                    "Impossibile caricare il Canonical Asset "
+                    "utilizzato dal Vertex Mapper.\n\n"
+                    f"Asset: {canonical_asset_id}\n"
+                    f"Errore: {error}",
+                )
+                return
+
+        canonical_mesh = canonical_asset.canonical_mesh
+
+        if canonical_mesh is None:
+            QMessageBox.critical(
+                self,
+                "Canonical Asset",
+                "Il Canonical Asset non contiene una "
+                "Canonical Mesh valida.",
+            )
+            return
+
+        #
+        # Memorizziamo l'asset effettivamente visualizzato.
+        #
+        self._canonical_asset = canonical_asset
 
         self.mesh_viewer.show_mesh(
-            template
+            canonical_mesh
         )
 
         # -----------------------------------------------------
@@ -416,7 +657,7 @@ class VertexMapperDialog(QDialog):
         )
 
         self.mesh_picker.set_mesh(
-            template
+            canonical_mesh
         )
 
         # -----------------------------------------------------
@@ -510,6 +751,38 @@ class VertexMapperDialog(QDialog):
         layout.addWidget(self.report_button)
 
         # -----------------------------------------------------
+        # Generazione Canonical Asset
+        # -----------------------------------------------------
+        #
+        # Questo pulsante non crea una nuova mappatura.
+        #
+        # Quando i 25 Control Points sono tutti associati,
+        # il Vertex Mapper può utilizzare il mapping definitivo
+        # per generare il Canonical Asset che entrerà nella
+        # Canonical Asset Library.
+        #
+        # Il vecchio progetto .face3d utilizzato durante
+        # l'authoring del mapping non viene copiato né conservato
+        # come parte dell'asset canonico.
+        #
+
+        self.generate_canonical_asset_button = QPushButton(
+            "Genera e salva Asset Canonico"
+        )
+
+        self.generate_canonical_asset_button.clicked.connect(
+            self._on_generate_canonical_asset
+        )
+
+        self.generate_canonical_asset_button.setEnabled(
+            False
+        )
+
+        layout.addWidget(
+            self.generate_canonical_asset_button
+        )
+
+        # -----------------------------------------------------
         # Pulsante chiusura
         # -----------------------------------------------------
 
@@ -529,6 +802,103 @@ class VertexMapperDialog(QDialog):
         self._update_map_button_state()
 
         QTimer.singleShot(0, self._refresh_viewer_after_show)
+
+    # ---------------------------------------------------------
+    # Canonical Asset information
+    # ---------------------------------------------------------
+    def _refresh_canonical_asset_info(self):
+        """
+        Aggiorna le informazioni dell'asset canonico effettivamente
+        utilizzato dal Vertex Mapper.
+
+        La visualizzazione è puramente informativa e non modifica
+        mesh, mapping o stato del progetto.
+        """
+        asset = getattr(
+            self,
+            "_canonical_asset",
+            None,
+        )
+
+        if asset is None:
+            return
+
+        asset_id = getattr(
+            asset,
+            "asset_id",
+            "—",
+        )
+
+        name = getattr(
+            asset,
+            "name",
+            "—",
+        )
+
+        asset_type = getattr(
+            asset,
+            "asset_type",
+            "—",
+        )
+
+        version = getattr(
+            asset,
+            "version",
+            "—",
+        )
+
+        mesh = getattr(
+            asset,
+            "canonical_mesh",
+            None,
+        )
+
+        if mesh is None:
+            mesh_info = "—"
+        else:
+            mesh_info = (
+                f"{len(mesh.vertices)} vertici / "
+                f"{len(mesh.triangles)} triangoli"
+            )
+
+        mapping = getattr(
+            asset,
+            "canonical_mapping",
+            None,
+        )
+
+        if mapping is None:
+            mapping_info = "—"
+        else:
+            try:
+                mapping_info = (
+                    f"{mapping.count()} / "
+                    f"{mapping.get_expected_control_points()}"
+                )
+            except Exception:
+                try:
+                    mapping_info = f"{mapping.count()} / 25"
+                except Exception:
+                    mapping_info = "presente"
+
+        self._canonical_info_id.setText(
+            str(asset_id)
+        )
+        self._canonical_info_name.setText(
+            str(name)
+        )
+        self._canonical_info_type.setText(
+            str(asset_type)
+        )
+        self._canonical_info_version.setText(
+            str(version)
+        )
+        self._canonical_info_mesh.setText(
+            mesh_info
+        )
+        self._canonical_info_mapping.setText(
+            mapping_info
+        )
 
     # ---------------------------------------------------------
     # Landmark changed
@@ -953,7 +1323,21 @@ class VertexMapperDialog(QDialog):
     # ---------------------------------------------------------
 
     def _refresh_viewer_after_show(self):
+        """
+        Completa l'inizializzazione visuale dopo che il GLViewWidget
+        è entrato nel contesto OpenGL reale.
+        """
+        self._refresh_canonical_asset_info()
         self._refresh_mapped_markers()
+
+        #
+        # Secondo passaggio al ciclo eventi: garantisce che i marker
+        # vengano aggiunti quando il viewport è già stato inizializzato.
+        #
+        QTimer.singleShot(
+            0,
+            self._refresh_mapped_markers,
+        )
 
     def _on_show_report(self):
         dialog=MappingReportDialog(self.landmark_catalog,self.mapping_collection,self)
@@ -1261,6 +1645,29 @@ class VertexMapperDialog(QDialog):
             landmark_is_mapped
         )
 
+        #
+        # Il Canonical Asset può essere generato esclusivamente
+        # quando il Canonical Mapping è completo.
+        #
+        # Usiamo is_complete() oltre al semplice conteggio:
+        # in questo modo il pulsante rispetta anche le regole
+        # di validazione del CanonicalMapping.
+        #
+
+        canonical_mapping_is_complete = False
+
+        if hasattr(
+            self.mapping_collection,
+            "is_complete",
+        ):
+            canonical_mapping_is_complete = (
+                self.mapping_collection.is_complete()
+            )
+
+        self.generate_canonical_asset_button.setEnabled(
+            canonical_mapping_is_complete
+        )
+
     # ---------------------------------------------------------
     # Create mapping button
     # ---------------------------------------------------------
@@ -1444,6 +1851,328 @@ class VertexMapperDialog(QDialog):
         self._refresh_progress_label()
         self._update_map_button_state()
         self._refresh_mapped_markers()
+
+    # ---------------------------------------------------------
+    # Generate Canonical Asset
+    # ---------------------------------------------------------
+
+    def _on_generate_canonical_asset(
+        self,
+    ):
+        """
+        Genera e salva il Canonical Asset a partire dal
+        Canonical Mapping completo.
+
+        Il Vertex Mapper è uno strumento di authoring:
+        il risultato di questa operazione è un asset canonico
+        indipendente dal progetto .face3d utilizzato per
+        costruire il mapping.
+
+        Pipeline
+        --------
+        CanonicalMapping
+            ↓
+        TemplateLoader
+            ↓
+        CanonicalMeshBuilder
+            ↓
+        CanonicalAssetBuilder
+            ↓
+        CanonicalAssetRepository
+        """
+
+        # -----------------------------------------------------
+        # 1. Verifica del mapping
+        # -----------------------------------------------------
+
+        if not hasattr(
+            self.mapping_collection,
+            "is_complete",
+        ):
+            QMessageBox.warning(
+                self,
+                "Canonical Asset",
+                "Il mapping corrente non supporta la "
+                "generazione di un Canonical Asset.",
+            )
+            return
+
+        if not self.mapping_collection.is_complete():
+            QMessageBox.warning(
+                self,
+                "Canonical Asset",
+                "Il Canonical Mapping non è completo.\n\n"
+                "È necessario associare tutti i 25 Control Points "
+                "prima di generare il Canonical Asset.",
+            )
+            return
+
+        # Il Canonical Asset Builder richiede un vero
+        # CanonicalMapping, non una VertexMappingCollection
+        # generica.
+        if not hasattr(
+            self.mapping_collection,
+            "canonical_mesh_id",
+        ):
+            QMessageBox.warning(
+                self,
+                "Canonical Asset",
+                "Il mapping corrente non contiene "
+                "l'identità della Canonical Mesh.",
+            )
+            return
+
+        # -----------------------------------------------------
+        # 2. Identità canonica
+        # -----------------------------------------------------
+
+        canonical_mesh_id = (
+            self.mapping_collection.canonical_mesh_id
+        )
+
+        canonical_mesh_version = (
+            self.mapping_collection.canonical_mesh_version
+        )
+
+        template_id = (
+            self.mapping_collection.template_id
+        )
+
+        template_version = (
+            self.mapping_collection.template_version
+        )
+
+        # Per questa prima Canonical Asset Library utilizziamo
+        # la testa MakeHuman Male 1591 già validata.
+        # L'architettura resta parametrica per futuri asset
+        # canonici, come teste bambino/donna o altre parti.
+        asset_id = canonical_mesh_id
+        asset_name = "MakeHuman Male 1591 Head"
+        asset_type = "HEAD"
+
+        # -----------------------------------------------------
+        # 3. Caricamento template
+        # -----------------------------------------------------
+
+        try:
+            template = TemplateLoader.load(
+                template_id,
+                "head",
+            )
+        except Exception as error:
+            QMessageBox.critical(
+                self,
+                "Canonical Asset",
+                "Impossibile caricare il template canonico.\n\n"
+                f"Template: {template_id}\n"
+                f"Errore: {error}",
+            )
+            return
+
+        # -----------------------------------------------------
+        # 4. Generazione Canonical Mesh
+        # -----------------------------------------------------
+
+        try:
+            canonical_mesh = CanonicalMeshBuilder.build(
+                template=template,
+                canonical_mesh_id=canonical_mesh_id,
+                canonical_mesh_version=canonical_mesh_version,
+                template_id=template_id,
+                template_version=template_version,
+                mesh_id="male1591_head",
+                source_mesh_file="male1591_head.obj",
+            )
+        except Exception as error:
+            QMessageBox.critical(
+                self,
+                "Canonical Asset",
+                "Impossibile generare la Canonical Mesh.\n\n"
+                f"Errore: {error}",
+            )
+            return
+
+        # -----------------------------------------------------
+        # 5. Creazione Canonical Asset
+        # -----------------------------------------------------
+
+        try:
+            asset = CanonicalAssetBuilder.build(
+                canonical_mesh=canonical_mesh,
+                canonical_mapping=self.mapping_collection,
+                asset_id=asset_id,
+                name=asset_name,
+                asset_type=asset_type,
+                version="1.0",
+            )
+        except Exception as error:
+            QMessageBox.critical(
+                self,
+                "Canonical Asset",
+                "Impossibile costruire il Canonical Asset.\n\n"
+                f"Errore: {error}",
+            )
+            return
+
+        # -----------------------------------------------------
+        # 6. Persistenza nella Canonical Asset Library
+        # -----------------------------------------------------
+        #
+        # La Library appartiene all'applicazione.
+        # Non viene utilizzato il vecchio progetto .face3d
+        # come contenitore dell'asset.
+        #
+
+        repository_root = (
+            Path(__file__).resolve().parents[1]
+            / "resources"
+            / "canonical"
+        )
+
+        repository = CanonicalAssetRepository(
+            repository_root
+        )
+
+        try:
+            asset_file = repository.save(
+                asset
+            )
+        except Exception as error:
+            QMessageBox.critical(
+                self,
+                "Canonical Asset",
+                "Impossibile salvare il Canonical Asset.\n\n"
+                f"Errore: {error}",
+            )
+            return
+
+        # -----------------------------------------------------
+        # 7. Verifica finale
+        # -----------------------------------------------------
+
+        if not repository.exists(
+            asset_id,
+            asset_type,
+        ):
+            QMessageBox.critical(
+                self,
+                "Canonical Asset",
+                "Il Canonical Asset è stato elaborato ma "
+                "non è stato trovato nella Canonical Asset Library.",
+            )
+            return
+
+        # -----------------------------------------------------
+        # 8. Associazione al progetto corrente
+        # -----------------------------------------------------
+        #
+        # Il Canonical Asset è stato generato e salvato
+        # nella Canonical Asset Library.
+        #
+        # Ora associamo al progetto corrente soltanto
+        # l'identità dell'asset.
+        #
+        # Il progetto NON conserva una copia della
+        # Canonical Mesh e NON utilizza il Canonical Mapping
+        # come dipendenza runtime.
+        #
+        # Il Canonical Asset completo rimane nella Library.
+        #
+
+        if self._controller is None:
+
+            QMessageBox.warning(
+                self,
+                "Canonical Asset",
+                "Canonical Asset generato e salvato "
+                "correttamente nella Library, ma non è "
+                "possibile associarlo al progetto corrente "
+                "perché il ProjectController non è disponibile.",
+            )
+
+            return
+
+        project = (
+            self._controller.get_project()
+        )
+
+        if project is None:
+
+            QMessageBox.warning(
+                self,
+                "Canonical Asset",
+                "Canonical Asset generato e salvato "
+                "correttamente nella Library, ma non è "
+                "possibile associarlo perché non è presente "
+                "un progetto aperto.",
+            )
+
+            return
+
+        try:
+
+            project.set_canonical_asset(
+                asset_id,
+                asset_type,
+            )
+
+            self._controller.save_project()
+
+        except Exception as error:
+
+            QMessageBox.critical(
+                self,
+                "Canonical Asset",
+                "Il Canonical Asset è stato salvato nella "
+                "Library, ma non è stato possibile associarlo "
+                "al progetto corrente.\n\n"
+                f"Errore: {error}",
+            )
+
+            return
+
+        # -----------------------------------------------------
+        # 9. Risultato
+        # -----------------------------------------------------
+
+        self.info.append("")
+        self.info.append(
+            "========== CANONICAL ASSET GENERATO =========="
+        )
+        self.info.append(
+            f"Asset ID : {asset.asset_id}"
+        )
+        self.info.append(
+            f"Tipo     : {asset.asset_type}"
+        )
+        self.info.append(
+            f"Mesh     : {canonical_mesh.canonical_mesh_id}"
+        )
+        self.info.append(
+            f"Vertices : {len(canonical_mesh.vertices)}"
+        )
+        self.info.append(
+            f"Triangles: {len(canonical_mesh.triangles)}"
+        )
+        self.info.append(
+            f"Mapping  : {self.mapping_collection.count()}/25"
+        )
+        self.info.append(
+            f"File     : {asset_file}"
+        )
+        self.info.append(
+            "=============================================="
+        )
+
+        QMessageBox.information(
+            self,
+            "Canonical Asset",
+            "Canonical Asset generato e salvato "
+            "correttamente.\n\n"
+            f"Asset: {asset.asset_id}\n"
+            f"Mapping: {self.mapping_collection.count()}/25\n"
+            f"File: {asset_file}",
+        )
 
     # ---------------------------------------------------------
     # Remove mapping

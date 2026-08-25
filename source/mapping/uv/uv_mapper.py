@@ -2,66 +2,150 @@
 ==========================================================
 Face3D Studio AI
 
-File:
-uv_mapper.py
+UV Mapper
 
 Descrizione:
-Genera le coordinate UV della mesh del volto.
+Gestisce la generazione delle coordinate UV
+della mesh del volto.
 
 Autore:
 Marco Cantù
 
+Versione:
+1.2.0
 ==========================================================
 """
 
 from source.models.face import Face
-from source.models.uv_coordinate import UVCoordinate
 
 
 class UVMapper:
     """
-    Genera le coordinate UV della FaceMesh.
+    Gestisce le coordinate UV della FaceMesh.
+
+    ATTENZIONE
+    ----------
+    La generazione della vera parametrizzazione UV
+    della Canonical Mesh non è ancora implementata.
+
+    In particolare, non è corretto utilizzare i
+    landmark MediaPipe come coordinate UV dei vertici
+    della mesh.
+
+    Il numero dei landmark MediaPipe e il numero dei
+    vertici della Canonical Mesh sono infatti concetti
+    distinti:
+
+        MediaPipe landmarks:
+            468
+
+        Canonical Mesh:
+            1604 vertici
+
+    Questa classe mantiene quindi, in questa fase,
+    l'API UV senza introdurre una parametrizzazione
+    geometrica arbitraria.
+
+    La successiva implementazione UV dovrà produrre
+    una coordinata UV per ogni vertice della mesh.
     """
 
     # ---------------------------------------------------------
+    # GENERATE
+    # ---------------------------------------------------------
 
     @staticmethod
-    def generate(face: Face) -> None:
+    def generate(
+        face: Face,
+    ) -> None:
         """
-        Genera le coordinate UV della mesh.
+        Prepara la struttura UV della FaceMesh.
 
-        Per ora il metodo è solo uno scheletro.
-        Verrà implementato nello step successivo.
+        La vera parametrizzazione UV verrà implementata
+        in uno step successivo.
+
+        Il metodo deve comunque essere sicuro quando
+        viene invocato sulla Canonical Mesh ricostruita.
+
+        Non utilizza i landmark MediaPipe per indicizzare
+        i vertici della mesh.
+
+        Parameters
+        ----------
+        face:
+            Face contenente la FaceMesh.
+
+        Returns
+        -------
+        None
         """
+
+        #
+        # --------------------------------------------------
+        # 1. Validazione Face
+        # --------------------------------------------------
+        #
 
         if face is None:
-            raise ValueError("Face is None.")
+
+            raise ValueError(
+                "Face is None."
+            )
+
+        #
+        # --------------------------------------------------
+        # 2. Validazione FaceMesh
+        # --------------------------------------------------
+        #
 
         if face.mesh is None:
-            raise ValueError("Face mesh is None.")
 
-        if not face.landmarks:
-            raise ValueError("Face contains no landmarks.")
+            raise ValueError(
+                "Face mesh is None."
+            )
+
+        #
+        # --------------------------------------------------
+        # 3. Preparazione struttura UV
+        # --------------------------------------------------
+        #
+        # La parametrizzazione UV non è ancora implementata.
+        #
+        # Non dobbiamo quindi tentare di associare:
+        #
+        #     face.landmarks[index]
+        #
+        # al vertice:
+        #
+        #     face.mesh.vertices[index]
+        #
+        # perché i due insiemi hanno cardinalità e
+        # significato differenti.
+        #
+        # Esempio attuale:
+        #
+        #     landmark MediaPipe : 468
+        #     Canonical Mesh      : 1604
+        #
+        # Il vecchio comportamento provocava:
+        #
+        #     IndexError
+        #
+        # quando index raggiungeva 468.
+        #
 
         face.mesh.uv_coordinates.clear()
 
-        for index in range(len(face.mesh.vertices)):
+        #
+        # --------------------------------------------------
+        # 4. Nessuna parametrizzazione UV in questa fase
+        # --------------------------------------------------
+        #
+        # La lista rimane volutamente vuota.
+        #
+        # La generazione delle coordinate UV reali sarà
+        # implementata quando verrà introdotto il sistema
+        # di texturing della Canonical Mesh.
+        #
 
-            landmark = face.landmarks[index]
-
-            uv = UVCoordinate(
-
-                u=landmark.x,
-
-                v=1.0 - landmark.y,
-
-            )
-
-            face.mesh.uv_coordinates.append(
-                uv
-            )
-
-        if len(face.mesh.vertices) != len(face.mesh.uv_coordinates):
-            raise RuntimeError(
-                "Vertex count and UV count do not match."
-            )
+        return

@@ -66,6 +66,7 @@ class LocalDeformationEngine:
         target_points: np.ndarray,
         *,
         smoothing: float = 0.0,
+        influence_sigma: float = 0.20,
     ) -> None:
         """
         Costruisce un LocalDeformationEngine.
@@ -149,7 +150,25 @@ class LocalDeformationEngine:
                 "smoothing non può essere negativo."
             )
 
+        if not isinstance(influence_sigma, (int, float)):
+            raise TypeError(
+                "influence_sigma deve essere un valore numerico."
+            )
+
+        influence_sigma = float(influence_sigma)
+
+        if not np.isfinite(influence_sigma):
+            raise ValueError(
+                "influence_sigma deve essere un valore finito."
+            )
+
+        if influence_sigma <= 0.0:
+            raise ValueError(
+                "influence_sigma deve essere maggiore di zero."
+            )
+
         self._smoothing = smoothing
+        self._influence_sigma = influence_sigma
 
         #
         # Displacement dei Control Points.
@@ -308,6 +327,14 @@ class LocalDeformationEngine:
         return self._smoothing
 
     @property
+    def influence_sigma(self) -> float:
+        """
+        Restituisce la sigma del campo di influenza Gaussian.
+        """
+
+        return self._influence_sigma
+
+    @property
     def control_point_count(self) -> int:
         """
         Restituisce il numero di Control Points.
@@ -375,6 +402,63 @@ class LocalDeformationEngine:
         return result
 
     # ==========================================================
+    # Gaussian Influence
+    # ==========================================================
+
+    def influence_weights(
+        self,
+        points: np.ndarray,
+    ) -> np.ndarray:
+        """
+        Calcola il peso di influenza Gaussian per ogni punto.
+
+        Il peso dipende dalla distanza dal Control Point
+        più vicino:
+
+            w(d) = exp(
+                -(d ** 2) / (2 * sigma ** 2)
+            )
+
+        Un Control Point ha distanza zero e quindi peso 1.0.
+        Il campo rimane continuo: nessun punto viene escluso
+        completamente.
+        """
+
+        points = self._validate_points(
+            points,
+            "points",
+        )
+
+        deltas = (
+            points[:, np.newaxis, :]
+            - self._source_points[np.newaxis, :, :]
+        )
+
+        distances = np.linalg.norm(
+            deltas,
+            axis=2,
+        )
+
+        nearest_distance = np.min(
+            distances,
+            axis=1,
+        )
+
+        weights = np.exp(
+            -(nearest_distance ** 2)
+            / (2.0 * self._influence_sigma ** 2)
+        )
+
+        if not np.all(np.isfinite(weights)):
+            raise ValueError(
+                "Il campo di influenza contiene "
+                "valori non finiti."
+            )
+
+        return weights
+
+
+    # ==========================================================
     # Deformation
     # ==========================================================
 
@@ -387,8 +471,15 @@ class LocalDeformationEngine:
 
         Formula:
 
+            tps_displacement = displacement(points)
+
+            weight = influence_weights(points)
+
+            local_displacement =
+                tps_displacement * weight[:, None]
+
             deformed =
-                points + displacement(points)
+                points + local_displacement
 
         Parameters
         ----------
@@ -414,7 +505,16 @@ class LocalDeformationEngine:
             points
         )
 
-        result = points + displacement
+        weights = self.influence_weights(
+            points
+        )
+
+        local_displacement = (
+            displacement
+            * weights[:, np.newaxis]
+        )
+
+        result = points + local_displacement
 
         if not np.all(np.isfinite(result)):
             raise ValueError(

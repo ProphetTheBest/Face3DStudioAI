@@ -8,21 +8,20 @@ Autore:
 Marco Cantù
 
 Versione:
-2.1.0
+3.0.0
 ==========================================================
 """
 
+from __future__ import annotations
 
-from source.models.face import Face
 
-
-from source.models.mapping.canonical_mapping import (
-    CanonicalMapping,
+from source.models.face import (
+    Face,
 )
 
 
-from source.models.canonical_mesh import (
-    CanonicalMesh,
+from source.models.canonical_asset import (
+    CanonicalAsset,
 )
 
 
@@ -31,122 +30,167 @@ from source.reconstruction.builders.head_reconstruction_builder import (
 )
 
 
-from source.reconstruction.builders.canonical_mesh_builder import (
-    CanonicalMeshBuilder,
-)
-
-
-from source.reconstruction.loaders.template_loader import (
-    TemplateLoader,
-)
-
-
-from source.reconstruction.analyzers.template_analyzer import (
-    TemplateAnalyzer,
-)
-
-
 class HeadReconstructionPipeline:
     """
     Coordina tutti gli algoritmi
     di ricostruzione della testa.
+
+    Il Canonical Asset rappresenta la sorgente canonica
+    completa utilizzata dal Reconstruction Engine.
+
+    Il Canonical Asset contiene:
+
+        - Canonical Mesh;
+        - Canonical Mapping.
+
+    La Pipeline estrae questi due componenti e li passa
+    al HeadReconstructionBuilder.
+
+    La Pipeline non costruisce più la Canonical Mesh
+    partendo direttamente dal template anatomico.
+
+    Il template anatomico rimane utilizzabile dagli
+    strumenti di authoring, come il Vertex Mapper,
+    ma non rappresenta più la sorgente runtime
+    della Canonical Mesh.
     """
 
-    _template = None
-
-    _canonical_mesh: CanonicalMesh | None = None
+    # ======================================================
+    # PUBLIC API
+    # ======================================================
 
     @staticmethod
     def build(
         face: Face,
-        canonical_mapping: CanonicalMapping | None = None,
+        canonical_asset: CanonicalAsset | None = None,
     ) -> Face:
         """
-        Punto di ingresso del
-        Reconstruction Engine.
+        Punto di ingresso del Reconstruction Engine.
 
-        Il Canonical Mapping viene ricevuto
-        dal livello applicativo e inoltrato
-        al Reconstruction Builder.
+        Parameters
+        ----------
+        face:
+            Volto rilevato da MediaPipe.
 
-        La Canonical Mesh viene costruita
-        una sola volta a partire dal template.
+        canonical_asset:
+            Canonical Asset completo contenente:
 
-        Può essere None per mantenere
-        la compatibilità con le chiamate
-        esistenti.
+                - Canonical Mesh;
+                - Canonical Mapping.
+
+        Returns
+        -------
+        Face
+            Lo stesso oggetto Face ricevuto in ingresso,
+            aggiornato con la geometria ricostruita.
+
+        Raises
+        ------
+        ValueError
+            Se il Canonical Asset non è disponibile,
+            non è valido, non contiene la Canonical Mesh
+            oppure non contiene il Canonical Mapping.
         """
 
-        #
-        # Caricamento del template
-        # (una sola volta)
-        #
+        # --------------------------------------------------
+        # Validazione Face
+        # --------------------------------------------------
 
-        if HeadReconstructionPipeline._template is None:
+        if face is None:
 
-            HeadReconstructionPipeline._template = (
-                TemplateLoader.load(
-                    "male1591",
-                    "head",
-                )
+            raise ValueError(
+                "Il parametro face non può essere None."
             )
 
-            template = (
-                HeadReconstructionPipeline._template
+        # --------------------------------------------------
+        # Validazione Canonical Asset
+        # --------------------------------------------------
+
+        if canonical_asset is None:
+
+            raise ValueError(
+                "Il CanonicalAsset è obbligatorio "
+                "per la ricostruzione della testa."
             )
 
-            print()
-            print("========== HEAD TEMPLATE ==========")
-            print(f"Nome      : {template.name}")
-            print(f"Vertici   : {len(template.vertices)}")
-            print(f"Triangoli : {len(template.triangles)}")
-            print("===================================")
-            print()
+        if not isinstance(
+            canonical_asset,
+            CanonicalAsset,
+        ):
 
-            bounds = TemplateAnalyzer.bounds(
-                template
+            raise TypeError(
+                "Il parametro canonical_asset deve essere "
+                "un'istanza di CanonicalAsset."
             )
 
-            print("========== TEMPLATE BOUNDS ==========")
-            print(f"Width  : {bounds.width:.4f}")
-            print(f"Height : {bounds.height:.4f}")
-            print(f"Depth  : {bounds.depth:.4f}")
-            print()
+        # --------------------------------------------------
+        # Validazione completa dell'asset
+        # --------------------------------------------------
 
-            print(
-                f"Center : "
-                f"({bounds.center.x:.4f}, "
-                f"{bounds.center.y:.4f}, "
-                f"{bounds.center.z:.4f})"
+        canonical_asset.validate()
+
+        # --------------------------------------------------
+        # Canonical Mesh
+        # --------------------------------------------------
+
+        if not canonical_asset.has_mesh():
+
+            raise ValueError(
+                "Il CanonicalAsset non contiene "
+                "una CanonicalMesh."
             )
 
-            print("=====================================")
-            print()
+        canonical_mesh = (
+            canonical_asset.canonical_mesh
+        )
 
-        #
-        # Costruzione Canonical Mesh
-        # (una sola volta)
-        #
+        if canonical_mesh is None:
 
-        if HeadReconstructionPipeline._canonical_mesh is None:
-
-            HeadReconstructionPipeline._canonical_mesh = (
-                CanonicalMeshBuilder.build(
-                    HeadReconstructionPipeline._template,
-                    canonical_mesh_id="makehuman_male1591_head",
-                    canonical_mesh_version="1.0",
-                    template_id="male1591",
-                    template_version="1.0",
-                )
+            raise ValueError(
+                "Il CanonicalAsset dichiara una CanonicalMesh "
+                "ma la CanonicalMesh non è disponibile."
             )
 
-        #
+        # --------------------------------------------------
+        # Canonical Mapping
+        # --------------------------------------------------
+
+        if not canonical_asset.has_mapping():
+
+            raise ValueError(
+                "Il CanonicalAsset non contiene "
+                "un CanonicalMapping."
+            )
+
+        canonical_mapping = (
+            canonical_asset.canonical_mapping
+        )
+
+        if canonical_mapping is None:
+
+            raise ValueError(
+                "Il CanonicalAsset dichiara un CanonicalMapping "
+                "ma il CanonicalMapping non è disponibile."
+            )
+
+        # --------------------------------------------------
+        # Validazione mapping
+        # --------------------------------------------------
+
+        if not canonical_mapping.is_complete():
+
+            raise ValueError(
+                "Il CanonicalMapping del CanonicalAsset "
+                "non è completo."
+            )
+
+        # --------------------------------------------------
         # Reconstruction
-        #
+        # --------------------------------------------------
 
         face = HeadReconstructionBuilder.build(
             face,
-            HeadReconstructionPipeline._canonical_mesh,
+            canonical_mesh,
             canonical_mapping,
         )
 

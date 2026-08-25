@@ -11,14 +11,13 @@ Technical Lead AI:
 ChatGPT
 
 Versione documento:
-2.9
+3.0
 
 Ultimo aggiornamento:
-20/08/2026
+25/08/2026
 
 Stato:
-Roadmap riallineato allo stato verificato del progetto dopo
-la chiusura completa dello Sprint 26 — Local Deformation.
+Roadmap riallineato allo stato verificato del progetto dopo la chiusura dello Sprint 26 — Local Deformation e la successiva stabilizzazione dell'architettura Project / Subject / Canonical Asset.
 
 ---
 
@@ -3594,7 +3593,7 @@ Alla data del 20/08/2026:
         COMPLETATO
 
     Sprint 27
-        PIANIFICATO
+        PIANIFICATO — DEVIAZIONE TECNICA: GEOMETRIA MEDIAPIPE ↔ CANONICAL
 
     Sprint 28
         PIANIFICATO
@@ -8807,3 +8806,251 @@ La nuova sessione deve ripartire dal presente checkpoint.
 
 Non ripetere il lavoro già completato a meno che un test non
 dimostri una regressione reale.
+
+---
+
+# 254. CONGELAMENTO DEL PROGETTO — 25/08/2026
+
+## Stato
+
+Alla data del 25/08/2026 il progetto viene considerato
+**CONGELATO E VERIFICATO** nello stato corrente.
+
+Lo Sprint 26 — Local Deformation rimane completato e verificato.
+
+Successivamente è stata completata una stabilizzazione architetturale
+relativa alla gestione delle elaborazioni e della Canonical Asset Library.
+
+Questa stabilizzazione non modifica il principio geometrico della pipeline.
+
+---
+
+## 254.1 Architettura Project / Subject / Source Assets
+
+Il `Project` rappresenta il contenitore del lavoro.
+
+All'interno del Project possono essere presenti più
+`ReconstructionSubject`, ciascuno rappresentante una persona
+o una specifica elaborazione.
+
+Concettualmente:
+
+    Project
+       │
+       ├── Subject A
+       │      ├── source photos
+       │      └── Canonical Asset A
+       │
+       ├── Subject B
+       │      ├── source photos
+       │      └── Canonical Asset B
+       │
+       └── Subject C
+              ├── source photos
+              └── Canonical Asset C
+
+Il Canonical Asset non è quindi un'unica mesh obbligatoria
+per tutto il Project.
+
+La scelta della Canonical Asset viene associata alla singola
+elaborazione / Subject e viene persistita nel Project.
+
+Questo permette, ad esempio, di utilizzare nello stesso Project:
+
+    famiglia_crippa
+
+una Canonical Asset maschile per il padre,
+una Canonical Asset femminile per la madre
+e una Canonical Asset infantile per il figlio,
+senza creare Project separati.
+
+La stessa architettura permette inoltre di mantenere più fotografie
+appartenenti allo stesso Subject e di utilizzare la Canonical Asset
+associata a quella specifica elaborazione.
+
+---
+
+## 254.2 Canonical Asset Library
+
+La Canonical Asset Library è ora considerata una sorgente
+separata e versionabile delle mesh canoniche disponibili.
+
+La selezione della Canonical Asset avviene durante la creazione
+di una nuova ricostruzione.
+
+Il dialogo:
+
+    New Reconstruction
+
+permette di:
+
+- elencare le Canonical Asset disponibili;
+- selezionare l'asset più appropriato;
+- utilizzare l'asset di default quando necessario;
+- conservare nel Subject l'identificativo dell'asset;
+- conservare tipo e versione dell'asset;
+- ricostruire correttamente l'associazione alla riapertura del Project.
+
+---
+
+## 254.3 Persistenza
+
+La relazione persistente è concettualmente:
+
+    Project
+       ↓
+    ReconstructionSubject
+       ↓
+    source_asset_ids
+       +
+    canonical_asset_id
+       +
+    canonical_asset_type
+       +
+    canonical_asset_version
+
+Il caricamento del Project deve ricostruire questa relazione
+senza perdere l'associazione alla Canonical Asset.
+
+La Canonical Asset Library rimane indipendente dai dati specifici
+del Subject.
+
+---
+
+## 254.4 Principio geometrico invariato
+
+La stabilizzazione dell'architettura Project / Subject / Canonical Asset
+non modifica il principio fondamentale della ricostruzione:
+
+    Canonical Mesh
+          ↓
+    Global Alignment
+          ↓
+    Local Deformation
+          ↓
+    Personalized Mesh
+
+La Canonical Mesh continua a comandare la topologia della ricostruzione.
+
+La deformazione modifica la geometria derivata,
+non l'identità dei vertici né la topologia canonica.
+
+Questo principio rimane vincolante per lo Sprint 27.
+
+---
+
+# 255. REGOLA DI CONGELAMENTO
+
+Da questo punto:
+
+1. non modificare componenti già verificati senza una necessità tecnica;
+2. non introdurre redesign architetturali;
+3. una modifica principale alla volta;
+4. verificare l'applicazione dopo ogni modifica;
+5. verificare sempre le regressioni;
+6. mantenere Project / Subject / Canonical Asset funzionanti;
+7. mantenere il Canonical Mapping 25/25;
+8. non perdere le associazioni durante salvataggio, chiusura e riapertura;
+9. aggiornare ROADMAP e CHANGELOG al termine della milestone;
+10. chiudere la milestone con commit e push.
+
+---
+
+# 256. SPRINT 27 — DEVIAZIONE TECNICA
+
+## Motivazione
+
+La sequenza originaria prevedeva per lo Sprint 27
+la Head Reconstruction.
+
+Durante le verifiche successive allo Sprint 26 è emerso però
+che il problema prioritario non è ancora la ricostruzione della testa completa.
+
+Il problema prioritario è la qualità della relazione geometrica:
+
+    MediaPipe Face Surface
+             ↕
+    MakeHuman Canonical Face
+
+La mesh MediaPipe rilevata sulla fotografia viene considerata
+il riferimento facciale da preservare.
+
+La Canonical Mesh deve invece mantenere:
+
+- identità dei vertici;
+- topologia;
+- triangolazione;
+- struttura canonica;
+
+adattando la propria geometria alla forma facciale osservata.
+
+---
+
+## Obiettivo dello Sprint 27 deviato
+
+Lo Sprint 27 viene quindi temporaneamente riallineato a:
+
+    MediaPipe Face
+          ↓
+    superficie facciale di riferimento
+          ↓
+    Canonical Face
+          ↓
+    adattamento geometrico controllato
+          ↓
+    Canonical topology preservata
+          ↓
+    Personalized Face
+
+L'obiettivo non è sostituire la Canonical Mesh
+con la mesh MediaPipe.
+
+L'obiettivo è utilizzare MediaPipe come riferimento geometrico
+per correggere la forma della Canonical Face.
+
+---
+
+## Vincoli
+
+Durante lo Sprint 27 devono rimanere invariati:
+
+- Project / Subject architecture;
+- Canonical Asset Library;
+- Canonical Asset selection;
+- Canonical Mapping;
+- 25/25 Control Points;
+- Registration Engine;
+- Global Alignment;
+- Local Deformation già verificata;
+- topologia della Canonical Mesh;
+- identità e ordine dei vertici;
+- triangolazione.
+
+Ogni nuova soluzione geometrica deve essere verificata
+prima di essere integrata nella pipeline.
+
+---
+
+## Test diagnostici
+
+I test sperimentali utilizzati durante la ricerca dello Sprint 27
+sono considerati strumenti temporanei di sviluppo.
+
+Non costituiscono automaticamente parte della suite definitiva
+di regressione.
+
+Al termine della deviazione dovrà essere mantenuto solamente
+il test diagnostico o di integrazione realmente utile
+alla soluzione finale.
+
+---
+
+## Ripresa della roadmap
+
+La Head Reconstruction rimane l'obiettivo successivo
+della roadmap, ma viene posticipata fino alla stabilizzazione
+della relazione geometrica MediaPipe ↔ Canonical Face.
+
+La numerazione degli Sprint successivi verrà riallineata
+alla chiusura dello Sprint 27, senza modificare retroattivamente
+gli Sprint già completati.

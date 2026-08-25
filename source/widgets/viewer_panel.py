@@ -8,7 +8,7 @@ Autore:
 Marco Cantù
 
 Versione:
-0.6.0
+0.9.2
 ==========================================================
 """
 
@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
     QSplitter,
     QWidget,
     QVBoxLayout,
+    QHBoxLayout,
 )
 
 
@@ -33,7 +34,6 @@ from source.controllers.project_controller import (
 )
 
 
-from source.models import face
 from source.models.assets.image_asset import (
     ImageAsset,
 )
@@ -44,6 +44,12 @@ from source.widgets.base_panel import BasePanel
 from source.widgets.image_viewer import ImageViewer
 
 from source.widgets.mesh_viewer import MeshViewer
+
+from source.models.geometry.builders.face_mesh_builder import (
+    FaceMeshBuilder,
+)
+
+from source.models.geometry.vertex3d import Vertex3D
 
 
 class ViewerPanel(BasePanel):
@@ -69,10 +75,33 @@ class ViewerPanel(BasePanel):
             self._on_face_selected
         )
 
+        #
+        # Viewer 3D
+        #
+        # Sinistra: mesh MediaPipe originale a 468 vertici.
+        # Destra: testa completa ricostruita.
+        #
+        # I due viewer condividono la camera.
+        #
+
+        self.mediapipe_viewer = MeshViewer()
+
         self.mesh_viewer = MeshViewer()
 
+        self.mediapipe_viewer.camera_changed.connect(
+            self._sync_complete_head_camera
+        )
+
+        self.mesh_viewer.camera_changed.connect(
+            self._sync_mediapipe_camera
+        )
+
         #
-        # Splitter verticale
+        # Splitter verticale principale:
+        #
+        #   immagine
+        #       |
+        #   due viewer 3D affiancati
         #
 
         splitter = QSplitter(Qt.Vertical)
@@ -81,15 +110,94 @@ class ViewerPanel(BasePanel):
             self.image_viewer
         )
 
-        splitter.addWidget(
-            self.mesh_viewer
+        comparison_widget = QWidget()
+
+        comparison_layout = QHBoxLayout(
+            comparison_widget
         )
 
-        splitter.setStretchFactor(0, 3)
+        comparison_layout.setContentsMargins(
+            0,
+            0,
+            0,
+            0,
+        )
 
-        splitter.setStretchFactor(1, 2)
+        #
+        # MediaPipe.
+        #
 
-        splitter.setSizes([500, 300])
+        mediapipe_panel = QWidget()
+
+        mediapipe_layout = QVBoxLayout(
+            mediapipe_panel
+        )
+
+        mediapipe_layout.setContentsMargins(
+            0,
+            0,
+            0,
+            0,
+        )
+
+        mediapipe_layout.addWidget(
+            self.mediapipe_viewer,
+            1,
+        )
+
+        #
+        # Complete Head.
+        #
+
+        complete_head_panel = QWidget()
+
+        complete_head_layout = QVBoxLayout(
+            complete_head_panel
+        )
+
+        complete_head_layout.setContentsMargins(
+            0,
+            0,
+            0,
+            0,
+        )
+
+        complete_head_layout.addWidget(
+            self.mesh_viewer,
+            1,
+        )
+
+        comparison_layout.addWidget(
+            mediapipe_panel
+        )
+
+        comparison_layout.addWidget(
+            complete_head_panel
+        )
+
+        comparison_layout.setStretch(
+            0,
+            1,
+        )
+
+        comparison_layout.setStretch(
+            1,
+            1,
+        )
+
+        splitter.addWidget(
+            comparison_widget
+        )
+
+        splitter.setStretchFactor(0, 1)
+        splitter.setStretchFactor(1, 3)
+
+        # La comparazione 3D deve occupare la maggior parte
+        # dell'area disponibile. La fotografia rimane visibile
+        # ma non deve comprimere i due viewer 3D.
+        splitter.setSizes(
+            [320, 900]
+        )
 
         container = QWidget()
 
@@ -104,6 +212,78 @@ class ViewerPanel(BasePanel):
     # ---------------------------------------------------------
 
     # ---------------------------------------------------------
+    # Camera synchronization
+    # ---------------------------------------------------------
+
+    def _sync_complete_head_camera(self, state) -> None:
+        self.mesh_viewer.apply_camera_state(state)
+
+    # ---------------------------------------------------------
+
+    def _sync_mediapipe_camera(self, state) -> None:
+        self.mediapipe_viewer.apply_camera_state(state)
+
+    # ---------------------------------------------------------
+
+    def _build_mediapipe_mesh(self, face):
+        """
+        Ricostruisce esclusivamente a fini visuali la mesh
+        MediaPipe originale a 468 vertici.
+
+        La face.mesh completa NON viene modificata.
+        """
+
+        if face is None:
+            return None
+
+        landmarks = getattr(
+            face,
+            "landmarks",
+            None,
+        )
+
+        if not landmarks:
+            return None
+
+        # IMPORTANTE:
+        #
+        # I landmark vengono utilizzati dal RegistrationEngine
+        # direttamente nelle coordinate MediaPipe:
+        #
+        #     (x, y, z)
+        #
+        # La Complete Head viene quindi portata nello stesso
+        # sistema di coordinate dal Global Alignment.
+        #
+        # Non dobbiamo invertire Y e Z e non dobbiamo applicare
+        # una scalatura arbitraria. La versione precedente usava:
+        #
+        #     x = (x - 0.5) * 2
+        #     y = (0.5 - y) * 2
+        #     z = -z * 2
+        #
+        # che equivaleva, dal punto di vista dell'orientamento,
+        # a invertire contemporaneamente Y e Z. Questo produceva
+        # la rotazione apparente di 180 gradi osservata nel viewer.
+        #
+        # Qui costruiamo invece la mesh MediaPipe nello stesso
+        # sistema di coordinate usato dalla registrazione.
+        vertices = [
+            Vertex3D(
+                x=landmark.x,
+                y=landmark.y,
+                z=landmark.z,
+            )
+            for landmark in landmarks
+        ]
+
+        return FaceMeshBuilder.build(
+            vertices
+        )
+
+    # ---------------------------------------------------------
+
+    # ---------------------------------------------------------
 
     def show_current_asset(self) -> None:
 
@@ -113,6 +293,7 @@ class ViewerPanel(BasePanel):
 
             self.image_viewer.clear()
 
+            self.mediapipe_viewer.clear()
             self.mesh_viewer.clear()
 
             return
@@ -123,6 +304,7 @@ class ViewerPanel(BasePanel):
 
             self.image_viewer.clear()
 
+            self.mediapipe_viewer.clear()
             self.mesh_viewer.clear()
 
             return
@@ -136,21 +318,22 @@ class ViewerPanel(BasePanel):
         )
 
         #
-        # Canonical Mapping
+        # Canonical Asset
         #
-        # Il mapping appartiene al progetto
-        # corrente e viene passato al servizio
-        # di analisi senza introdurre una
-        # dipendenza del Reconstruction Engine
-        # dalla GUI.
+        # Il Canonical Asset appartiene
+        # semanticamente al progetto corrente.
+        #
+        # Il ViewerPanel non accede direttamente
+        # alla struttura interna del Project e
+        # non carica direttamente la Canonical
+        # Asset Library.
+        #
+        # La risoluzione dell'asset viene delegata
+        # al ProjectController.
         #
 
-        project = self._controller.get_project()
-
-        canonical_mapping = (
-            project.canonical_mapping
-            if project is not None
-            else None
+        canonical_asset = (
+            self._controller.get_canonical_asset()
         )
 
         #
@@ -160,7 +343,7 @@ class ViewerPanel(BasePanel):
         self._analysis_service.analyze(
             asset,
             filename,
-            canonical_mapping,
+            canonical_asset,
         )
 
         #
@@ -193,7 +376,21 @@ class ViewerPanel(BasePanel):
                 )
 
                 #
-                # Viewer 3D
+                # Viewer 3D MediaPipe originale
+                #
+
+                mediapipe_mesh = (
+                    self._build_mediapipe_mesh(
+                        face
+                    )
+                )
+
+                self.mediapipe_viewer.show_mesh(
+                    mediapipe_mesh
+                )
+
+                #
+                # Viewer 3D testa completa
                 #
 
                 self.mesh_viewer.show_mesh(
@@ -210,6 +407,7 @@ class ViewerPanel(BasePanel):
 
         else:
 
+            self.mediapipe_viewer.clear()
             self.mesh_viewer.clear()
 
     # ---------------------------------------------------------
@@ -234,6 +432,24 @@ class ViewerPanel(BasePanel):
                 face.landmarks,
                 face.mesh.edges,
             )
+
+            #
+            # Viewer MediaPipe originale.
+            #
+
+            mediapipe_mesh = (
+                self._build_mediapipe_mesh(
+                    face
+                )
+            )
+
+            self.mediapipe_viewer.show_mesh(
+                mediapipe_mesh
+            )
+
+            #
+            # Viewer testa completa.
+            #
 
             self.mesh_viewer.show_mesh(
                 face.mesh
