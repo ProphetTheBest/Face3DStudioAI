@@ -45,22 +45,18 @@ from source.models.face_mesh import FaceMesh
 from source.models.geometry.vertex3d import Vertex3D
 from source.models.mapping.canonical_mapping import CanonicalMapping
 
-from source.reconstruction.algorithms.local_deformation import (
-    LocalDeformationEngine,
-)
-
 from source.reconstruction.analyzers.mesh_boundary_analyzer import (
     MeshBoundaryAnalyzer,
 )
 
-from source.reconstruction.registration.registration_engine import (
-    RegistrationEngine,
+from source.reconstruction.algorithms.v10_head_deformation import (
+    V10HeadDeformationEngine,
+    V10HeadDeformationConfig,
 )
 
-from source.models.landmarks.standard_landmarks import (
-    create_standard_landmarks,
+from source.ai.topology.canonical_face_model import (
+    CanonicalFaceModel,
 )
-
 
 class HeadReconstructionBuilder:
     """
@@ -69,19 +65,62 @@ class HeadReconstructionBuilder:
     Il Builder rappresenta il punto di orchestrazione tra:
 
     - Canonical Mesh;
-    - Global Alignment;
-    - Local Deformation;
+    - V10 Head Deformation Engine;
     - FaceMesh risultante;
     - analisi geometrica successiva.
 
-    Gli algoritmi matematici rimangono separati
-    nei rispettivi componenti.
+    La LocalDeformationEngine / TPS non viene più utilizzata.
 
-    Il metodo build() è statico per mantenere la
+    Il metodo build() rimane statico per mantenere la
     compatibilità con HeadReconstructionPipeline.
     """
 
-    VERSION = "3.0.1"
+    VERSION = "3.1.0"
+
+    # ------------------------------------------------------------------
+    # V10 - ANCHOR VALIDATI
+    # ------------------------------------------------------------------
+    #
+    # Ogni tupla contiene:
+    #
+    #     nome anatomico
+    #     indice MediaPipe
+    #     indice globale Canonical
+    #
+    # Questi sono i 21 anchor della pipeline V10 validata.
+    #
+    V10_ANCHORS = [
+        ("forehead_center",     10, 534),
+        ("chin",               152, 487),
+        ("nose_bridge",          1, 216),
+        ("nose_left_base",      98,  92),
+        ("nose_right_base",    327, 364),
+        ("nose_lower_center",    2, 531),
+        ("nose_tip",              4, 537),
+        ("upper_lip_center",    13, 536),
+        ("lower_lip_center",    14, 259),
+        ("mouth_right",          61,  62),
+        ("mouth_left",          291, 333),
+        ("upper_lip_right",      78,  55),
+        ("upper_lip_left",      308, 326),
+        ("right_eyebrow_outer",  55,  82),
+        ("right_eyebrow_inner",  46,  85),
+        ("left_eyebrow_outer", 285, 354),
+        ("left_eyebrow_inner", 276, 357),
+        ("right_eye_inner",     133,  26),
+        ("left_eye_outer",      263, 303),
+        ("left_eye_inner",      362, 298),
+        ("right_eye_outer",      33, 211),
+    ]
+
+    EXPECTED_CANONICAL_VERTICES = 1604
+    EXPECTED_CANONICAL_TRIANGLES = 3064
+
+    EXPECTED_FACE_VERTICES = 490
+    EXPECTED_FACE_TRIANGLES = 936
+
+    EXPECTED_MEDIAPIPE_VERTICES = 468
+    EXPECTED_MEDIAPIPE_TRIANGLES = 898
 
     # ======================================================
     # PUBLIC API
@@ -94,29 +133,37 @@ class HeadReconstructionBuilder:
         canonical_mapping: CanonicalMapping | None = None,
     ) -> Face:
         """
-        Esegue la ricostruzione della testa.
+        Esegue la ricostruzione V10 della testa.
 
         Parametri
         ---------
         face:
-            Volto rilevato contenente i landmark.
+            Volto rilevato contenente i 468 landmark MediaPipe.
 
         canonical_mesh:
-            Canonical Mesh di riferimento.
+            Canonical Mesh completa della testa.
 
         canonical_mapping:
-            Mapping tra landmark MediaPipe e vertici
-            della Canonical Mesh.
+            Mapping applicativo legacy mantenuto per compatibilità
+            con HeadReconstructionPipeline.
+
+            ATTENZIONE:
+            la deformazione V10 non utilizza i 25 Control Points
+            del CanonicalMapping. Utilizza esclusivamente i 21
+            anchor V10 definiti in V10_ANCHORS.
 
         Ritorna
         -------
         Face
             Lo stesso oggetto Face ricevuto in ingresso,
-            con face.mesh aggiornata con la geometria
-            ricostruita.
+            con face.mesh aggiornata con la geometria V10.
 
         La Canonical Mesh originale non viene modificata.
         """
+
+        # --------------------------------------------------
+        # 0. Validazione input
+        # --------------------------------------------------
 
         if face is None:
             raise ValueError(
@@ -128,60 +175,36 @@ class HeadReconstructionBuilder:
                 "Il parametro canonical_mesh non può essere None."
             )
 
+        if not face.landmarks:
+            raise RuntimeError(
+                "Il Face non contiene landmark MediaPipe."
+            )
+
+        if len(face.landmarks) < (
+            HeadReconstructionBuilder.EXPECTED_MEDIAPIPE_VERTICES
+        ):
+            raise RuntimeError(
+                "Il Face contiene meno di 468 landmark MediaPipe: "
+                f"{len(face.landmarks)}."
+            )
+
+        # Il CanonicalMapping resta obbligatorio a livello di
+        # contratto applicativo, anche se V10 non lo utilizza
+        # per costruire gli anchor.
         if canonical_mapping is None:
             raise ValueError(
                 "Il CanonicalMapping è obbligatorio "
                 "per la ricostruzione della testa."
             )
 
-        #
-        # --------------------------------------------------
-        # 1. Validazione del mapping.
-        # --------------------------------------------------
-        #
-
         if not canonical_mapping.is_complete():
             raise ValueError(
                 "Il CanonicalMapping non è completo."
             )
 
-        #
         # --------------------------------------------------
-        # 2. Global Alignment.
+        # 1. Estrazione geometria Canonical
         # --------------------------------------------------
-        #
-
-        registration_result = (
-            RegistrationEngine.register(
-                face,
-                canonical_mesh,
-                canonical_mapping,
-            )
-        )
-
-        if not registration_result.is_success():
-            raise RuntimeError(
-                "Global Alignment fallito: "
-                f"{registration_result.message}"
-            )
-
-        transformation = (
-            registration_result.transformation
-        )
-
-        if transformation is None:
-            raise RuntimeError(
-                "Global Alignment riuscito ma "
-                "RegistrationTransformation assente."
-            )
-
-        #
-        # --------------------------------------------------
-        # 3. Estrazione della geometria canonica.
-        #
-        # La CanonicalMesh non viene modificata.
-        # --------------------------------------------------
-        #
 
         canonical_vertices = (
             HeadReconstructionBuilder._vertices_to_numpy(
@@ -189,201 +212,390 @@ class HeadReconstructionBuilder:
             )
         )
 
-        #
-        # --------------------------------------------------
-        # 4. Applicazione del Global Alignment.
-        # --------------------------------------------------
-        #
-
-        aligned_vertices = (
-            HeadReconstructionBuilder._apply_transformation(
-                canonical_vertices,
-                transformation.matrix,
+        canonical_triangles = (
+            HeadReconstructionBuilder._triangles_to_numpy(
+                canonical_mesh
             )
         )
 
-        #
-        # --------------------------------------------------
-        # 5. Estrazione dei Control Points canonici.
-        #
-        # Usiamo esclusivamente l'API pubblica
-        # CanonicalMapping.all().
-        #
-        # ATTENZIONE:
-        #
-        # landmark_index è un indice MediaPipe e NON
-        # rappresenta necessariamente la posizione del
-        # Control Point nella lista dei 25 landmark.
-        # --------------------------------------------------
-        #
-
-        mappings = canonical_mapping.all()
-
-        if not mappings:
-            raise RuntimeError(
-                "Il CanonicalMapping non contiene "
-                "alcun mapping."
-            )
-
-        #
-        # Ordinamento deterministico.
-        #
-        # L'ordinamento viene effettuato in base
-        # all'indice MediaPipe del landmark.
-        #
-        # Non assumiamo che gli indici siano consecutivi.
-        #
-
-        mappings = sorted(
-            mappings,
-            key=lambda mapping: mapping.landmark_index,
-        )
-
-        #
-        # --------------------------------------------------
-        # 6. Costruzione dei Control Points allineati.
-        # --------------------------------------------------
-        #
-
-        aligned_control_points = []
-
-        for mapping in mappings:
-
-            vertex_index = mapping.vertex_index
-
-            if (
-                vertex_index < 0
-                or vertex_index >= len(aligned_vertices)
-            ):
-                raise RuntimeError(
-                    "Il VertexMapping contiene un "
-                    f"vertex_index non valido: {vertex_index}"
-                )
-
-            aligned_control_points.append(
-                aligned_vertices[vertex_index]
-            )
-
-        aligned_control_points = np.asarray(
-            aligned_control_points,
-            dtype=np.float64,
-        )
-
-        #
-        # --------------------------------------------------
-        # 7. Estrazione ordinata dei landmark reali.
-        #
-        # La lista dei landmark deve essere ordinata
-        # nello stesso ordine dei mapping.
-        #
-        # Esistono due casi supportati:
-        #
-        # A) Face contenente l'intero set MediaPipe.
-        #
-        #    In questo caso:
-        #
-        #        face.landmarks[landmark_index]
-        #
-        # B) Face contenente soltanto i 25 landmark
-        #    standard del progetto.
-        #
-        #    In questo caso l'ordine della lista è quello
-        #    restituito da create_standard_landmarks().
-        #
-        # Questo secondo caso è utilizzato dai test di
-        # integrazione e permette di lavorare con un
-        # Face sintetico senza dover costruire tutti
-        # i landmark MediaPipe.
-        # --------------------------------------------------
-        #
-
-        target_control_points = (
-            HeadReconstructionBuilder._landmarks_to_numpy(
-                face,
-                mappings,
-            )
-        )
-
-        #
-        # --------------------------------------------------
-        # 8. Verifica corrispondenza Control Points.
-        # --------------------------------------------------
-        #
-
-        if (
-            len(aligned_control_points)
-            != len(target_control_points)
+        if len(canonical_vertices) != (
+            HeadReconstructionBuilder.EXPECTED_CANONICAL_VERTICES
         ):
             raise RuntimeError(
-                "Il numero dei Control Points canonici "
-                "non coincide con il numero dei landmark "
-                "del volto."
+                "Numero inatteso di vertici Canonical: "
+                f"{len(canonical_vertices)} "
+                f"(attesi "
+                f"{HeadReconstructionBuilder.EXPECTED_CANONICAL_VERTICES})."
             )
 
-        if len(aligned_control_points) == 0:
+        if len(canonical_triangles) != (
+            HeadReconstructionBuilder.EXPECTED_CANONICAL_TRIANGLES
+        ):
             raise RuntimeError(
-                "Non sono disponibili Control Points "
-                "per la Local Deformation."
+                "Numero inatteso di triangoli Canonical: "
+                f"{len(canonical_triangles)} "
+                f"(attesi "
+                f"{HeadReconstructionBuilder.EXPECTED_CANONICAL_TRIANGLES})."
             )
 
+        # --------------------------------------------------
+        # 2. Estrazione Face Component V10
+        # --------------------------------------------------
+        #
+        # La Face Component viene identificata dalla topologia
+        # della Canonical Head:
+        #
+        #     490 vertici
+        #     936 triangoli
+        #
+        # Gli indici restituiti sono:
+        #
+        #     face_global_indices -> GLOBALI
+        #     face_triangles      -> LOCALI
         #
         # --------------------------------------------------
-        # 9. Local Deformation TPS.
-        # --------------------------------------------------
-        #
 
-        local_deformation = (
-            LocalDeformationEngine(
-                aligned_control_points,
-                target_control_points,
-                smoothing=0.0,
+        (
+            face_global_indices,
+            face_triangles,
+        ) = HeadReconstructionBuilder._extract_v10_face_component(
+            canonical_vertices,
+            canonical_triangles,
+        )
+
+        if len(face_global_indices) != (
+            HeadReconstructionBuilder.EXPECTED_FACE_VERTICES
+        ):
+            raise RuntimeError(
+                "Numero inatteso di vertici della Face Component: "
+                f"{len(face_global_indices)}."
+            )
+
+        if len(face_triangles) != (
+            HeadReconstructionBuilder.EXPECTED_FACE_TRIANGLES
+        ):
+            raise RuntimeError(
+                "Numero inatteso di triangoli della Face Component: "
+                f"{len(face_triangles)}."
+            )
+
+        # --------------------------------------------------
+        # 3. Estrazione geometria MediaPipe
+        # --------------------------------------------------
+        #
+        # IMPORTANTE:
+        #
+        # Non utilizziamo face.mesh.vertices.
+        #
+        # face.mesh può contenere la conversione:
+        #
+        #     x=(lm.x-0.5)*2
+        #     y=(0.5-lm.y)*2
+        #     z=-lm.z*2
+        #
+        # La V10 lavora invece con i landmark MediaPipe
+        # originali.
+        #
+        # --------------------------------------------------
+
+        mediapipe_vertices = (
+            HeadReconstructionBuilder._build_v10_mediapipe_vertices(
+                face
             )
         )
 
+        # La topologia MediaPipe 468/898 è quella del
+        # CanonicalFaceModel utilizzato dalla FaceMesh.
+        mediapipe_canonical_mesh = CanonicalFaceModel.mesh()
+
+        mediapipe_triangles = (
+            HeadReconstructionBuilder._triangles_to_numpy(
+                mediapipe_canonical_mesh
+            )
+        )
+
+        if len(mediapipe_vertices) != (
+            HeadReconstructionBuilder.EXPECTED_MEDIAPIPE_VERTICES
+        ):
+            raise RuntimeError(
+                "Numero inatteso di vertici MediaPipe: "
+                f"{len(mediapipe_vertices)}."
+            )
+
+        if len(mediapipe_triangles) != (
+            HeadReconstructionBuilder.EXPECTED_MEDIAPIPE_TRIANGLES
+        ):
+            raise RuntimeError(
+                "Numero inatteso di triangoli MediaPipe: "
+                f"{len(mediapipe_triangles)}."
+            )
+
+        # --------------------------------------------------
+        # 4. Costruzione dei 21 anchor V10
+        # --------------------------------------------------
+        #
+        # build_anchor_arrays restituisce:
+        #
+        #     canonical_points
+        #     mediapipe_points
+        #     source_indices
+        #     names
+        #
+        # source_indices sono INDICI LOCALI della Face Component.
         #
         # --------------------------------------------------
-        # 10. Deformazione di tutti i vertici.
+
+        (
+            _canonical_anchor_points,
+            target_positions,
+            source_landmarks,
+            anchor_names,
+        ) = V10HeadDeformationEngine.build_anchor_arrays(
+            face_global_indices,
+            canonical_vertices[
+                face_global_indices
+            ],
+            mediapipe_vertices,
+            HeadReconstructionBuilder.V10_ANCHORS,
+        )
+
+        if len(anchor_names) != 21:
+            raise RuntimeError(
+                "Numero inatteso di anchor V10: "
+                f"{len(anchor_names)} (attesi 21)."
+            )
+
+        if source_landmarks.shape != (21,):
+            raise RuntimeError(
+                "Gli indici sorgente V10 devono avere "
+                "forma (21,)."
+            )
+
+        if target_positions.shape != (21, 3):
+            raise RuntimeError(
+                "Le posizioni target V10 devono avere "
+                "forma (21, 3)."
+            )
+
+        # --------------------------------------------------
+        # 5. Esecuzione V10 - Face Component
         # --------------------------------------------------
         #
+        # Pipeline interna:
+        #
+        #     Canonical Face
+        #          ↓
+        #     Procrustes
+        #          ↓
+        #     NRICP Sumner
+        #          ↓
+        #     Face deformata
+        #
+        # Il metodo restituisce:
+        #
+        #     deformed_face_vertices
+        #     face_displacement
+        #     records
+        #
+        # Il displacement è espresso rispetto alla Face
+        # Component Canonical originale.
+        #
+        # --------------------------------------------------
+
+        v10_engine = V10HeadDeformationEngine(
+            V10HeadDeformationConfig()
+        )
+
+        (
+            deformed_face_vertices,
+            face_displacement,
+            _nricp_records,
+            procrustes_matrix,
+        ) = v10_engine.deform_face(
+            canonical_face_vertices=(
+                canonical_vertices[
+                    face_global_indices
+                ]
+            ),
+            canonical_face_triangles=face_triangles,
+            mediapipe_vertices=mediapipe_vertices,
+            mediapipe_triangles=mediapipe_triangles,
+            source_landmarks=source_landmarks,
+            target_positions=target_positions,
+        )
+
+        if procrustes_matrix.shape != (4, 4):
+            raise RuntimeError(
+                "La matrice Procrustes V10 ha forma inattesa: "
+                f"{procrustes_matrix.shape}."
+            )
+
+        if not np.all(
+            np.isfinite(procrustes_matrix)
+        ):
+            raise RuntimeError(
+                "La matrice Procrustes V10 contiene "
+                "valori non finiti."
+            )
+
+        if deformed_face_vertices.shape != (
+            HeadReconstructionBuilder.EXPECTED_FACE_VERTICES,
+            3,
+        ):
+            raise RuntimeError(
+                "La V10 Face Component deformata ha forma inattesa: "
+                f"{deformed_face_vertices.shape}."
+            )
+
+        if face_displacement.shape != (
+            HeadReconstructionBuilder.EXPECTED_FACE_VERTICES,
+            3,
+        ):
+            raise RuntimeError(
+                "Il displacement V10 della Face Component ha "
+                f"forma inattesa: {face_displacement.shape}."
+            )
+
+        if not np.all(
+            np.isfinite(deformed_face_vertices)
+        ):
+            raise RuntimeError(
+                "La V10 Face Component deformata contiene "
+                "valori non finiti."
+            )
+
+        if not np.all(
+            np.isfinite(face_displacement)
+        ):
+            raise RuntimeError(
+                "Il displacement V10 contiene valori non finiti."
+            )
+
+        # --------------------------------------------------
+        # 6. Trasferimento del displacement alla Head
+        # --------------------------------------------------
+        #
+        # Il V10 engine mantiene il vincolo esatto sui 490
+        # vertici della Face Component e interpola il campo
+        # sui vertici esterni.
+        #
+        # --------------------------------------------------
+
+        full_displacement = (
+            v10_engine.transfer_displacement(
+                canonical_vertices=canonical_vertices,
+                face_global_indices=face_global_indices,
+                face_displacement=face_displacement,
+            )
+        )
+
+        if full_displacement.shape != (
+            HeadReconstructionBuilder.EXPECTED_CANONICAL_VERTICES,
+            3,
+        ):
+            raise RuntimeError(
+                "Il displacement completo V10 ha forma inattesa: "
+                f"{full_displacement.shape}."
+            )
+
+        if not np.all(
+            np.isfinite(full_displacement)
+        ):
+            raise RuntimeError(
+                "Il displacement completo V10 contiene "
+                "valori non finiti."
+            )
+
+        # --------------------------------------------------
+        # 7. Costruzione della Canonical Head deformata
+        # --------------------------------------------------
+        #
+        # La Canonical Head completa deve essere portata
+        # nello stesso sistema di riferimento utilizzato
+        # dalla Face Component durante il Procrustes V10.
+        #
+        # Il displacement NRICP viene poi applicato
+        # alla Head già allineata.
+        #
+        # Questo riproduce la sequenza validata in V10-C3/C5:
+        #
+        #     Canonical Head
+        #          ↓
+        #     Procrustes
+        #          ↓
+        #     Head allineata
+        #          ↓
+        #     displacement V10
+        #          ↓
+        #     Head deformata
+        #
+        # --------------------------------------------------
+
+        aligned_head_vertices = (
+            HeadReconstructionBuilder._apply_v10_transform(
+                canonical_vertices,
+                procrustes_matrix,
+            )
+        )
 
         deformed_vertices = (
-            local_deformation.deform(
-                aligned_vertices
-            )
+            aligned_head_vertices
+            + full_displacement
         )
 
-        #
-        # --------------------------------------------------
-        # 11. Validazione geometria risultante.
-        # --------------------------------------------------
-        #
-
-        if (
-            deformed_vertices.shape
-            != canonical_vertices.shape
+        if deformed_vertices.shape != (
+            HeadReconstructionBuilder.EXPECTED_CANONICAL_VERTICES,
+            3,
         ):
             raise RuntimeError(
-                "La Local Deformation ha modificato "
-                "la dimensione della geometria."
+                "La geometria V10 risultante ha dimensione inattesa: "
+                f"{deformed_vertices.shape}."
             )
 
         if not np.all(
             np.isfinite(deformed_vertices)
         ):
             raise RuntimeError(
-                "La Local Deformation ha prodotto "
+                "La geometria V10 risultante contiene "
                 "valori non finiti."
             )
 
+        # --------------------------------------------------
+        # 8. Vincolo esatto sulla Face Component
+        # --------------------------------------------------
+        #
+        # Il transfer deve conservare esattamente il displacement
+        # prodotto dalla V10 sui 490 vertici facciali.
         #
         # --------------------------------------------------
-        # 12. Costruzione della FaceMesh.
+
+        exact_face_error = np.max(
+            np.linalg.norm(
+                full_displacement[
+                    face_global_indices
+                ]
+                - face_displacement,
+                axis=1,
+            )
+        )
+
+        if exact_face_error > 1.0e-8:
+            raise RuntimeError(
+                "Il trasferimento V10 non conserva esattamente "
+                "il displacement della Face Component. "
+                f"Errore massimo: {exact_face_error:.15e}"
+            )
+
+        # --------------------------------------------------
+        # 9. Costruzione della FaceMesh finale
+        # --------------------------------------------------
         #
-        # La topologia viene copiata dalla Canonical Mesh.
+        # La topologia viene COPIATA dalla Canonical Mesh.
         #
         # Non vengono creati nuovi triangoli.
-        # --------------------------------------------------
+        # Non vengono modificati gli indici.
         #
+        # --------------------------------------------------
 
         reconstructed_vertices = (
             HeadReconstructionBuilder._numpy_to_vertices(
@@ -395,16 +607,30 @@ class HeadReconstructionBuilder:
             canonical_mesh.triangles
         )
 
+        if len(reconstructed_vertices) != (
+            HeadReconstructionBuilder.EXPECTED_CANONICAL_VERTICES
+        ):
+            raise RuntimeError(
+                "La FaceMesh ricostruita contiene un numero "
+                "inatteso di vertici."
+            )
+
+        if len(reconstructed_triangles) != (
+            HeadReconstructionBuilder.EXPECTED_CANONICAL_TRIANGLES
+        ):
+            raise RuntimeError(
+                "La FaceMesh ricostruita contiene un numero "
+                "inatteso di triangoli."
+            )
+
         face.mesh = FaceMesh(
             vertices=reconstructed_vertices,
             triangles=reconstructed_triangles,
         )
 
-        #
         # --------------------------------------------------
-        # 13. Analisi del boundary sulla mesh ricostruita.
+        # 10. Analisi boundary
         # --------------------------------------------------
-        #
 
         boundary_analyzer = MeshBoundaryAnalyzer()
 
@@ -414,11 +640,9 @@ class HeadReconstructionBuilder:
             )
         )
 
-        #
         # --------------------------------------------------
-        # 14. Estensione futura della testa.
+        # 11. Estensione futura della testa
         # --------------------------------------------------
-        #
 
         HeadReconstructionBuilder._extend_head(
             face,
@@ -430,6 +654,79 @@ class HeadReconstructionBuilder:
     # ======================================================
     # GEOMETRY CONVERSION
     # ======================================================
+    @staticmethod
+    def _apply_v10_transform(
+        vertices: np.ndarray,
+        matrix: np.ndarray,
+    ) -> np.ndarray:
+        """
+        Applica una trasformazione omogenea 4x4
+        a una matrice di vertici (N, 3).
+
+        La trasformazione viene applicata nello stesso
+        modo utilizzato dalla pipeline V10-C3.
+
+        La topologia della mesh non viene modificata.
+        """
+
+        vertices = np.asarray(
+            vertices,
+            dtype=np.float64,
+        )
+
+        matrix = np.asarray(
+            matrix,
+            dtype=np.float64,
+        )
+
+        if vertices.ndim != 2 or vertices.shape[1] != 3:
+            raise ValueError(
+                "I vertici devono avere forma (N, 3)."
+            )
+
+        if matrix.shape != (4, 4):
+            raise ValueError(
+                "La matrice V10 deve avere forma (4, 4)."
+            )
+
+        if not np.all(
+            np.isfinite(vertices)
+        ):
+            raise ValueError(
+                "I vertici contengono valori non finiti."
+            )
+
+        if not np.all(
+            np.isfinite(matrix)
+        ):
+            raise ValueError(
+                "La matrice V10 contiene valori non finiti."
+            )
+
+        vertices_h = np.column_stack(
+            [
+                vertices,
+                np.ones(
+                    len(vertices),
+                    dtype=np.float64,
+                ),
+            ]
+        )
+
+        transformed = (
+            vertices_h
+            @ matrix.T
+        )[:, :3]
+
+        if not np.all(
+            np.isfinite(transformed)
+        ):
+            raise RuntimeError(
+                "La trasformazione V10 ha prodotto "
+                "vertici non finiti."
+            )
+
+        return transformed
 
     @staticmethod
     def _vertices_to_numpy(
@@ -477,6 +774,52 @@ class HeadReconstructionBuilder:
         return vertices
 
     @staticmethod
+    def _triangles_to_numpy(
+        canonical_mesh: CanonicalMesh,
+    ) -> np.ndarray:
+        """
+        Converte i triangoli della mesh nel formato:
+
+            (N, 3)
+
+        con indici interi GLOBALI.
+        """
+
+        triangles = np.asarray(
+            [
+                [
+                    int(triangle.a),
+                    int(triangle.b),
+                    int(triangle.c),
+                ]
+                for triangle in canonical_mesh.triangles
+            ],
+            dtype=np.int64,
+        )
+
+        if triangles.ndim != 2:
+            raise RuntimeError(
+                "La topologia triangolare non ha "
+                "una forma NumPy valida."
+            )
+
+        if triangles.shape[1] != 3:
+            raise RuntimeError(
+                "Ogni triangolo deve contenere "
+                "esattamente tre indici."
+            )
+
+        if not np.all(
+            np.isfinite(triangles)
+        ):
+            raise RuntimeError(
+                "La topologia triangolare contiene "
+                "valori non finiti."
+            )
+
+        return triangles
+
+    @staticmethod
     def _numpy_to_vertices(
         vertices: np.ndarray,
     ) -> list[Vertex3D]:
@@ -484,6 +827,11 @@ class HeadReconstructionBuilder:
         Converte una matrice NumPy (N, 3)
         in una lista di Vertex3D.
         """
+
+        vertices = np.asarray(
+            vertices,
+            dtype=np.float64,
+        )
 
         if vertices.ndim != 2:
             raise ValueError(
@@ -497,6 +845,13 @@ class HeadReconstructionBuilder:
                 "per vertice."
             )
 
+        if not np.all(
+            np.isfinite(vertices)
+        ):
+            raise ValueError(
+                "La geometria contiene valori non finiti."
+            )
+
         return [
             Vertex3D(
                 float(vertex[0]),
@@ -506,262 +861,287 @@ class HeadReconstructionBuilder:
             for vertex in vertices
         ]
 
+    # ======================================================
+    # V10 - FACE COMPONENT
+    # ======================================================
+
     @staticmethod
-    def _landmarks_to_numpy(
+    def _extract_v10_face_component(
+        canonical_vertices: np.ndarray,
+        canonical_triangles: np.ndarray,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """
+        Estrae la Face Component V10 dalla Canonical Head.
+
+        La Face Component viene identificata esclusivamente
+        attraverso la topologia.
+
+        Componente attesa:
+
+            490 vertici
+            936 triangoli
+
+        Restituisce:
+
+            face_global_indices
+            face_triangles
+
+        Gli indici dei triangoli restituiti sono LOCALI
+        alla Face Component.
+        """
+
+        canonical_vertices = np.asarray(
+            canonical_vertices,
+            dtype=np.float64,
+        )
+
+        canonical_triangles = np.asarray(
+            canonical_triangles,
+            dtype=np.int64,
+        )
+
+        vertex_count = len(
+            canonical_vertices
+        )
+
+        if canonical_triangles.ndim != 2:
+            raise RuntimeError(
+                "La topologia Canonical non ha "
+                "forma (N, 3)."
+            )
+
+        if canonical_triangles.shape[1] != 3:
+            raise RuntimeError(
+                "La topologia Canonical deve contenere "
+                "triangoli a tre indici."
+            )
+
+        # --------------------------------------------------
+        # Costruzione grafo di adiacenza
+        # --------------------------------------------------
+
+        adjacency = [
+            set()
+            for _ in range(vertex_count)
+        ]
+
+        for triangle in canonical_triangles:
+
+            a = int(triangle[0])
+            b = int(triangle[1])
+            c = int(triangle[2])
+
+            if (
+                a < 0
+                or b < 0
+                or c < 0
+                or a >= vertex_count
+                or b >= vertex_count
+                or c >= vertex_count
+            ):
+                raise RuntimeError(
+                    "La Canonical Mesh contiene "
+                    "un indice triangolare fuori intervallo."
+                )
+
+            adjacency[a].update(
+                (b, c)
+            )
+
+            adjacency[b].update(
+                (a, c)
+            )
+
+            adjacency[c].update(
+                (a, b)
+            )
+
+        # --------------------------------------------------
+        # Connected Components
+        # --------------------------------------------------
+
+        visited = np.zeros(
+            vertex_count,
+            dtype=bool,
+        )
+
+        components = []
+
+        for start in range(vertex_count):
+
+            if visited[start]:
+                continue
+
+            stack = [start]
+            visited[start] = True
+            component = []
+
+            while stack:
+
+                current = stack.pop()
+
+                component.append(
+                    current
+                )
+
+                for neighbour in adjacency[current]:
+
+                    if not visited[neighbour]:
+
+                        visited[neighbour] = True
+
+                        stack.append(
+                            neighbour
+                        )
+
+            component.sort()
+
+            components.append(
+                np.asarray(
+                    component,
+                    dtype=np.int64,
+                )
+            )
+
+        # --------------------------------------------------
+        # Ricerca Face Component 490 / 936
+        # --------------------------------------------------
+
+        for component in components:
+
+            if len(component) != (
+                HeadReconstructionBuilder.EXPECTED_FACE_VERTICES
+            ):
+                continue
+
+            component_set = set(
+                int(index)
+                for index in component
+            )
+
+            component_triangles_global = []
+
+            for triangle in canonical_triangles:
+
+                a = int(triangle[0])
+                b = int(triangle[1])
+                c = int(triangle[2])
+
+                if (
+                    a in component_set
+                    and b in component_set
+                    and c in component_set
+                ):
+                    component_triangles_global.append(
+                        [
+                            a,
+                            b,
+                            c,
+                        ]
+                    )
+
+            if len(component_triangles_global) != (
+                HeadReconstructionBuilder.EXPECTED_FACE_TRIANGLES
+            ):
+                continue
+
+            # --------------------------------------------------
+            # GLOBAL -> LOCAL
+            # --------------------------------------------------
+
+            global_to_local = {
+                int(global_index): local_index
+                for local_index, global_index
+                in enumerate(component)
+            }
+
+            local_triangles = [
+                [
+                    global_to_local[
+                        int(triangle[0])
+                    ],
+                    global_to_local[
+                        int(triangle[1])
+                    ],
+                    global_to_local[
+                        int(triangle[2])
+                    ],
+                ]
+                for triangle in component_triangles_global
+            ]
+
+            return (
+                component,
+                np.asarray(
+                    local_triangles,
+                    dtype=np.int64,
+                ),
+            )
+
+        raise RuntimeError(
+            "Impossibile identificare la Face Component V10 "
+            "(490 vertici / 936 triangoli)."
+        )
+
+    # ======================================================
+    # V10 - MEDIAPIPE GEOMETRY
+    # ======================================================
+
+    @staticmethod
+    def _build_v10_mediapipe_vertices(
         face: Face,
-        mappings,
     ) -> np.ndarray:
         """
-        Estrae i landmark reali corrispondenti ai
-        Canonical Mapping.
+        Converte i 468 landmark MediaPipe originali
+        nel formato utilizzato dalla pipeline V10.
 
-        Sono supportati due formati di Face:
+        NON utilizza face.mesh.vertices.
 
-        1. Face contenente tutti i landmark MediaPipe.
-
-           In questo caso il landmark_index del mapping
-           è direttamente utilizzabile come indice
-           della lista:
-
-               face.landmarks[landmark_index]
-
-        2. Face sintetico contenente esclusivamente
-           i 25 landmark standard.
-
-           In questo caso viene utilizzato l'ordine
-           restituito da create_standard_landmarks()
-           per tradurre:
-
-               landmark_index
-                    ↓
-               posizione nella lista dei 25 landmark
+        Le coordinate rimangono quelle originali
+        restituite dal FaceLandmarker.
         """
 
         if not face.landmarks:
             raise RuntimeError(
-                "Il Face non contiene landmark."
+                "Il Face non contiene landmark MediaPipe."
             )
 
-        landmark_count = len(
-            face.landmarks
-        )
-
-        #
-        # Definizioni canoniche dei Control Points.
-        #
-
-        standard_landmarks = (
-            create_standard_landmarks()
-        )
-
-        standard_index_to_position = {
-            landmark.index: position
-            for position, landmark
-            in enumerate(standard_landmarks)
-        }
-
-        #
-        # Verifica dell'unicità delle definizioni.
-        #
-
-        if (
-            len(standard_index_to_position)
-            != len(standard_landmarks)
-        ):
+        if len(face.landmarks) < 468:
             raise RuntimeError(
-                "Il catalogo dei landmark standard "
-                "contiene indici duplicati."
+                "Il Face contiene meno di 468 landmark MediaPipe."
             )
 
-        selected_landmarks = []
-
-        #
-        # --------------------------------------------------
-        # Caso A:
-        # Face contenente tutti i landmark MediaPipe.
-        #
-        # Se il numero dei landmark è sufficiente a
-        # contenere il massimo indice MediaPipe utilizzato
-        # dal mapping, utilizziamo direttamente gli indici.
-        # --------------------------------------------------
-        #
-
-        max_landmark_index = max(
-            mapping.landmark_index
-            for mapping in mappings
-        )
-
-        if landmark_count > max_landmark_index:
-
-            for mapping in mappings:
-
-                landmark_index = (
-                    mapping.landmark_index
-                )
-
-                if (
-                    landmark_index < 0
-                    or landmark_index >= landmark_count
-                ):
-                    raise RuntimeError(
-                        "Il CanonicalMapping contiene "
-                        "un landmark_index non valido "
-                        f"per il Face: {landmark_index}"
-                    )
-
-                selected_landmarks.append(
-                    face.landmarks[
-                        landmark_index
-                    ]
-                )
-
-        #
-        # --------------------------------------------------
-        # Caso B:
-        # Face sintetico / compatto contenente soltanto
-        # i Control Points standard.
-        # --------------------------------------------------
-        #
-
-        elif (
-            landmark_count
-            == len(standard_landmarks)
-        ):
-
-            for mapping in mappings:
-
-                landmark_index = (
-                    mapping.landmark_index
-                )
-
-                if (
-                    landmark_index
-                    not in standard_index_to_position
-                ):
-                    raise RuntimeError(
-                        "Il CanonicalMapping contiene "
-                        "un landmark_index che non appartiene "
-                        "al catalogo dei landmark standard: "
-                        f"{landmark_index}"
-                    )
-
-                position = (
-                    standard_index_to_position[
-                        landmark_index
-                    ]
-                )
-
-                selected_landmarks.append(
-                    face.landmarks[position]
-                )
-
-        else:
-
-            raise RuntimeError(
-                "Il numero dei landmark del Face non è "
-                "compatibile con il CanonicalMapping. "
-                f"Landmark disponibili: {landmark_count}; "
-                f"landmark standard: "
-                f"{len(standard_landmarks)}; "
-                f"indice MediaPipe massimo richiesto: "
-                f"{max_landmark_index}."
-            )
-
-        #
-        # Conversione NumPy.
-        #
-
-        landmarks = np.asarray(
+        vertices = np.asarray(
             [
                 [
-                    float(landmark.x),
-                    float(landmark.y),
-                    float(landmark.z),
+                    float(point.x),
+                    float(point.y),
+                    float(point.z),
                 ]
-                for landmark in selected_landmarks
+                for point in face.landmarks[:468]
             ],
             dtype=np.float64,
         )
 
-        if landmarks.ndim != 2:
+        if vertices.shape != (
+            HeadReconstructionBuilder.EXPECTED_MEDIAPIPE_VERTICES,
+            3,
+        ):
             raise RuntimeError(
-                "I landmark del Face non hanno "
-                "una forma valida."
-            )
-
-        if landmarks.shape[1] != 3:
-            raise RuntimeError(
-                "I landmark del Face devono avere "
-                "coordinate X, Y e Z."
+                "La geometria MediaPipe V10 deve avere "
+                "shape (468, 3). "
+                f"Shape ricevuta: {vertices.shape}"
             )
 
         if not np.all(
-            np.isfinite(landmarks)
+            np.isfinite(vertices)
         ):
             raise RuntimeError(
-                "I landmark del Face contengono "
+                "La geometria MediaPipe contiene "
                 "valori non finiti."
             )
 
-        return landmarks
-
-    @staticmethod
-    def _apply_transformation(
-        points: np.ndarray,
-        matrix: np.ndarray,
-    ) -> np.ndarray:
-        """
-        Applica una trasformazione omogenea 4x4
-        a una matrice di punti 3D (N, 3).
-
-        La funzione non modifica l'array originale.
-        """
-
-        if matrix.shape != (4, 4):
-            raise ValueError(
-                "La RegistrationTransformation deve "
-                "essere una matrice 4x4."
-            )
-
-        homogeneous = np.column_stack(
-            (
-                points,
-                np.ones(
-                    len(points),
-                    dtype=np.float64,
-                ),
-            )
-        )
-
-        transformed = (
-            matrix
-            @ homogeneous.T
-        ).T
-
-        w = transformed[:, 3]
-
-        if np.any(
-            np.abs(w) < 1e-12
-        ):
-            raise RuntimeError(
-                "La trasformazione omogenea ha prodotto "
-                "coordinate con componente W nulla."
-            )
-
-        transformed = (
-            transformed[:, :3]
-            / w[:, np.newaxis]
-        )
-
-        if not np.all(
-            np.isfinite(transformed)
-        ):
-            raise RuntimeError(
-                "La trasformazione globale ha prodotto "
-                "coordinate non finite."
-            )
-
-        return transformed
+        return vertices
 
     # ======================================================
     # FUTURE HEAD EXTENSION

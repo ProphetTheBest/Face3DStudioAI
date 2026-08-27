@@ -102,6 +102,10 @@ class V10HeadDeformationResult:
 
     topology:
         Topologia originale della Canonical Head.
+
+    procrustes_matrix:
+        Trasformazione Procrustes utilizzata per allineare
+        la Face Component Canonical alla geometria MediaPipe.
     """
 
     deformed_vertices: np.ndarray
@@ -110,7 +114,7 @@ class V10HeadDeformationResult:
     face_displacement: Optional[np.ndarray] = None
     face_deformed_vertices: Optional[np.ndarray] = None
     topology: Optional[np.ndarray] = None
-
+    procrustes_matrix: Optional[np.ndarray] = None
 
 class V10HeadDeformationEngine:
     """
@@ -736,11 +740,24 @@ class V10HeadDeformationEngine:
         Trasferisce il campo di spostamento della Face Component
         alla Canonical Head completa.
 
-        I vertici appartenenti alla Face Component mantengono
-        esattamente il displacement facciale.
+        La procedura riproduce il trasferimento validato
+        durante V10-C3.
 
-        I vertici esterni ricevono una interpolazione pesata
-        basata sulla distanza dai vertici facciali.
+        I vertici della Face Component ricevono esattamente
+        il displacement facciale.
+
+        I vertici esterni ricevono un displacement interpolato
+        mediante:
+
+            - K nearest neighbors;
+            - pesatura gaussiana;
+            - stabilizzazione inverse-distance;
+            - attenuazione cosinusoidale tra
+              influence_radius e zero_displacement_radius.
+
+        Il trasferimento viene effettuato nel sistema di
+        riferimento della Canonical Head già allineata
+        tramite Procrustes.
         """
 
         canonical_vertices = self._as_vertices(
@@ -764,8 +781,8 @@ class V10HeadDeformationEngine:
             != face_displacement.shape[0]
         ):
             raise ValueError(
-                "Il numero dei vertici Face Component non coincide "
-                "con il campo di displacement."
+                "Il numero dei vertici Face Component "
+                "non coincide con il campo di displacement."
             )
 
         displacement = np.zeros_like(
@@ -773,7 +790,10 @@ class V10HeadDeformationEngine:
             dtype=np.float64,
         )
 
-        # Vincolo esatto sulla Face Component.
+        # ----------------------------------------------------------
+        # 1. Face Component: displacement esatto
+        # ----------------------------------------------------------
+
         displacement[
             face_global_indices
         ] = face_displacement
@@ -781,6 +801,10 @@ class V10HeadDeformationEngine:
         face_vertices = canonical_vertices[
             face_global_indices
         ]
+
+        # ----------------------------------------------------------
+        # 2. Identificazione vertici esterni
+        # ----------------------------------------------------------
 
         non_face_mask = np.ones(
             canonical_vertices.shape[0],
@@ -798,44 +822,17 @@ class V10HeadDeformationEngine:
         if non_face_indices.size == 0:
             return displacement
 
-        non_face_vertices = canonical_vertices[
+        # ----------------------------------------------------------
+        # 3. Vertici Head esterni
+        # ----------------------------------------------------------
+
+        points = canonical_vertices[
             non_face_indices
         ]
-
-        delta = (
-            non_face_vertices[:, None, :]
-            - face_vertices[None, :, :]
-        )
-
-        distances = np.linalg.norm(
-            delta,
-            axis=2,
-        )
 
         k = min(
             self.config.k_neighbors,
             face_vertices.shape[0],
-        )
-
-        nearest = np.argpartition(
-            distances,
-            kth=k - 1,
-            axis=1,
-        )[:, :k]
-
-        nearest_distances = np.take_along_axis(
-            distances,
-            nearest,
-            axis=1,
-        )
-
-        nearest_displacements = face_displacement[
-            nearest
-        ]
-
-        safe_distances = np.maximum(
-            nearest_distances,
-            self.config.numerical_tolerance,
         )
 
         influence_radius = max(
@@ -843,69 +840,214 @@ class V10HeadDeformationEngine:
             self.config.numerical_tolerance,
         )
 
-        weights = np.exp(
-            -(
-                safe_distances
-                / influence_radius
+        zero_displacement_radius = (
+            self.config.zero_displacement_radius
+        )
+
+        gaussian_power = (
+            self.config.gaussian_power
+        )
+
+        # ----------------------------------------------------------
+        # 4. Elaborazione a blocchi
+        #
+        # Identica strategicamente al V10-C3:
+        #
+        #     1604 x 490
+        #
+        # è sufficientemente piccolo per una matrice
+        # delle distanze densa.
+        # ----------------------------------------------------------
+
+        for start in range(
+            0,
+            len(points),
+            200,
+        ):
+
+            stop = min(
+                start + 200,
+                len(points),
             )
-            ** self.config.gaussian_power
-        )
 
-        weight_sum = np.sum(
-            weights,
-            axis=1,
-            keepdims=True,
-        )
+            block = points[
+                start:stop
+            ]
 
-        interpolated = (
-            np.sum(
-                weights[:, :, None]
-                * nearest_displacements,
+            distances = np.linalg.norm(
+                block[:, None, :]
+                - face_vertices[None, :, :],
+                axis=2,
+            )
+
+            # ------------------------------------------------------
+            # 5. K nearest neighbors
+            # ------------------------------------------------------
+
+            nearest_idx = np.argpartition(
+                distances,
+                kth=k - 1,
+                axis=1,
+            )[:, :k]
+
+            nearest_dist = np.take_along_axis(
+                distances,
+                nearest_idx,
                 axis=1,
             )
-            / np.maximum(
-                weight_sum,
-                self.config.numerical_tolerance,
-            )
-        )
 
-        nearest_distance = np.min(
-            distances,
-            axis=1,
-        )
+            # ------------------------------------------------------
+            # 6. Vertici fuori dal raggio massimo
+            #
+            # Come V10-C3:
+            #
+            # nearest distance > 0.65
+            #        ->
+            # displacement nullo
+            # ------------------------------------------------------
 
-        radius = self.config.zero_displacement_radius
-
-        attenuation = np.ones_like(
-            nearest_distance,
-            dtype=np.float64,
-        )
-
-        outside = nearest_distance >= radius
-
-        attenuation[outside] = 0.0
-
-        inside = ~outside
-
-        if radius > 0.0:
-            normalized = (
-                nearest_distance[inside]
-                / radius
+            active = (
+                nearest_dist[:, 0]
+                <= zero_displacement_radius
             )
 
-            attenuation[inside] = np.exp(
-                -(
-                    normalized
-                    ** self.config.gaussian_power
+            if np.any(active):
+
+                d = nearest_dist[
+                    active
+                ]
+
+                idx = nearest_idx[
+                    active
+                ]
+
+                # --------------------------------------------------
+                # 7. Gaussian weighting
+                # --------------------------------------------------
+
+                weights = np.exp(
+                    -np.power(
+                        d / influence_radius,
+                        gaussian_power,
+                    )
                 )
-            )
 
-        displacement[
-            non_face_indices
-        ] = (
-            interpolated
-            * attenuation[:, None]
-        )
+                # --------------------------------------------------
+                # 8. Inverse-distance stabilization
+                #
+                # QUESTO PASSAGGIO È PRESENTE NEL V10-C3
+                # ORIGINALE E NON DEVE ESSERE RIMOSSO.
+                # --------------------------------------------------
+
+                weights *= (
+                    1.0
+                    / np.maximum(
+                        d,
+                        1.0e-8,
+                    )
+                )
+
+                # --------------------------------------------------
+                # 9. Normalizzazione dei pesi
+                # --------------------------------------------------
+
+                weights_sum = np.sum(
+                    weights,
+                    axis=1,
+                    keepdims=True,
+                )
+
+                weights /= np.maximum(
+                    weights_sum,
+                    1.0e-15,
+                )
+
+                # --------------------------------------------------
+                # 10. Interpolazione displacement
+                # --------------------------------------------------
+
+                local_disp = np.sum(
+                    face_displacement[
+                        idx
+                    ]
+                    * weights[
+                        :, :, None
+                    ],
+                    axis=1,
+                )
+
+                # --------------------------------------------------
+                # 11. Attenuazione cosinusoidale
+                #
+                # V10-C3:
+                #
+                # d <= 0.28
+                #       -> attenuation = 1
+                #
+                # 0.28 < d < 0.65
+                #       -> cosine falloff
+                #
+                # d >= 0.65
+                #       -> attenuation = 0
+                # --------------------------------------------------
+
+                nearest = d[
+                    :, 0
+                ]
+
+                attenuation = np.ones_like(
+                    nearest
+                )
+
+                outer = (
+                    nearest
+                    > influence_radius
+                )
+
+                if np.any(outer):
+
+                    t = (
+                        nearest[outer]
+                        - influence_radius
+                    ) / max(
+                        zero_displacement_radius
+                        - influence_radius,
+                        1.0e-12,
+                    )
+
+                    t = np.clip(
+                        t,
+                        0.0,
+                        1.0,
+                    )
+
+                    attenuation[outer] = (
+                        0.5
+                        * (
+                            1.0
+                            + np.cos(
+                                np.pi * t
+                            )
+                        )
+                    )
+
+                local_disp *= (
+                    attenuation[:, None]
+                )
+
+                # --------------------------------------------------
+                # 12. Scrittura nel campo globale
+                # --------------------------------------------------
+
+                global_rows = (
+                    non_face_indices[
+                        start:stop
+                    ][active]
+                )
+
+                displacement[
+                    global_rows
+                ] = local_disp
 
         return displacement
 
@@ -1048,6 +1190,7 @@ class V10HeadDeformationEngine:
             face_displacement=face_displacement,
             face_deformed_vertices=face_deformed_vertices,
             topology=canonical_triangles.copy(),
+            procrustes_matrix=procrustes_matrix,
         )
 
     @staticmethod

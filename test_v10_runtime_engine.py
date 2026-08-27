@@ -838,6 +838,91 @@ def main():
     )
 
     # --------------------------------------------------------------
+    # PROCRUSTES BASELINE
+    # --------------------------------------------------------------
+    #
+    # Il runtime V10 produce la deformazione nel sistema di
+    # riferimento della Canonical Head gia' allineata tramite
+    # Procrustes.
+    #
+    # Per verificare correttamente la qualita' geometrica
+    # dobbiamo quindi confrontare:
+    #
+    #     Canonical Head allineata
+    #              VS
+    #     Canonical Head deformata runtime
+    #
+    # e NON:
+    #
+    #     Canonical Head originale
+    #              VS
+    #     Canonical Head deformata runtime
+    #
+    # V10-C3/C5 utilizza la stessa baseline allineata.
+    # --------------------------------------------------------------
+
+    if result.procrustes_matrix is None:
+        raise RuntimeError(
+            "Il risultato V10 non contiene "
+            "la matrice Procrustes."
+        )
+
+    procrustes_matrix = np.asarray(
+        result.procrustes_matrix,
+        dtype=np.float64,
+    )
+
+    if procrustes_matrix.shape != (
+        4,
+        4,
+    ):
+        raise RuntimeError(
+            "La matrice Procrustes ha forma inattesa: "
+            f"{procrustes_matrix.shape}."
+        )
+
+    if not np.all(
+        np.isfinite(procrustes_matrix)
+    ):
+        raise RuntimeError(
+            "La matrice Procrustes contiene "
+            "valori non finiti."
+        )
+
+    aligned_canonical_vertices = (
+        trimesh.transform_points(
+            geometry[
+                "canonical_vertices"
+            ],
+            procrustes_matrix,
+        )
+    )
+
+    if aligned_canonical_vertices.shape != (
+        EXPECTED_HEAD_VERTICES,
+        3,
+    ):
+        raise RuntimeError(
+            "La Canonical Head allineata ha "
+            "shape inattesa: "
+            f"{aligned_canonical_vertices.shape}."
+        )
+
+    if not np.all(
+        np.isfinite(
+            aligned_canonical_vertices
+        )
+    ):
+        raise RuntimeError(
+            "La Canonical Head allineata contiene "
+            "valori non finiti."
+        )
+
+    print(
+        "Procrustes baseline : PASS"
+    )
+
+    # --------------------------------------------------------------
     # FINITENESS
     # --------------------------------------------------------------
 
@@ -1011,9 +1096,7 @@ def main():
     # --------------------------------------------------------------
 
     geometry_quality(
-        geometry[
-            "canonical_vertices"
-        ],
+        aligned_canonical_vertices,
         runtime_vertices,
         geometry[
             "canonical_triangles"
