@@ -75,7 +75,7 @@ class HeadReconstructionBuilder:
     compatibilità con HeadReconstructionPipeline.
     """
 
-    VERSION = "3.1.0"
+    VERSION = "3.2.0"
 
     # ------------------------------------------------------------------
     # V10 - ANCHOR VALIDATI
@@ -378,10 +378,15 @@ class HeadReconstructionBuilder:
             )
 
         # --------------------------------------------------
-        # 5. Esecuzione V10 - Face Component
+        # 5. Esecuzione V10 completa
         # --------------------------------------------------
         #
-        # Pipeline interna:
+        # IMPORTANTE:
+        #
+        # Il Builder NON replica più manualmente la pipeline V10.
+        # Delega l'intera deformazione a V10HeadDeformationEngine.deform().
+        #
+        # La pipeline unica è quindi:
         #
         #     Canonical Face
         #          ↓
@@ -389,16 +394,16 @@ class HeadReconstructionBuilder:
         #          ↓
         #     NRICP Sumner
         #          ↓
-        #     Face deformata
+        #     Face displacement
+        #          ↓
+        #     Canonical Head allineata
+        #          ↓
+        #     Transfer displacement
+        #          ↓
+        #     Deformed Head
         #
-        # Il metodo restituisce:
-        #
-        #     deformed_face_vertices
-        #     face_displacement
-        #     records
-        #
-        # Il displacement è espresso rispetto alla Face
-        # Component Canonical originale.
+        # Questo evita di duplicare nel Builder la logica già presente
+        # nel V10 runtime engine e mantiene una sola sorgente di verità.
         #
         # --------------------------------------------------
 
@@ -406,23 +411,45 @@ class HeadReconstructionBuilder:
             V10HeadDeformationConfig()
         )
 
-        (
-            deformed_face_vertices,
-            face_displacement,
-            _nricp_records,
-            procrustes_matrix,
-        ) = v10_engine.deform_face(
-            canonical_face_vertices=(
-                canonical_vertices[
-                    face_global_indices
-                ]
-            ),
-            canonical_face_triangles=face_triangles,
+        v10_result = v10_engine.deform(
+            canonical_vertices=canonical_vertices,
+            canonical_triangles=canonical_triangles,
+            face_triangles=face_triangles,
             mediapipe_vertices=mediapipe_vertices,
             mediapipe_triangles=mediapipe_triangles,
+            face_global_indices=face_global_indices,
             source_landmarks=source_landmarks,
             target_positions=target_positions,
         )
+
+        deformed_vertices = np.asarray(
+            v10_result.deformed_vertices,
+            dtype=np.float64,
+        )
+
+        full_displacement = np.asarray(
+            v10_result.displacement,
+            dtype=np.float64,
+        )
+
+        face_displacement = np.asarray(
+            v10_result.face_displacement,
+            dtype=np.float64,
+        )
+
+        deformed_face_vertices = np.asarray(
+            v10_result.face_deformed_vertices,
+            dtype=np.float64,
+        )
+
+        procrustes_matrix = np.asarray(
+            v10_result.procrustes_matrix,
+            dtype=np.float64,
+        )
+
+        # --------------------------------------------------
+        # 6. Validazione del risultato V10
+        # --------------------------------------------------
 
         if procrustes_matrix.shape != (4, 4):
             raise RuntimeError(
@@ -456,6 +483,24 @@ class HeadReconstructionBuilder:
                 f"forma inattesa: {face_displacement.shape}."
             )
 
+        if full_displacement.shape != (
+            HeadReconstructionBuilder.EXPECTED_CANONICAL_VERTICES,
+            3,
+        ):
+            raise RuntimeError(
+                "Il displacement completo V10 ha forma inattesa: "
+                f"{full_displacement.shape}."
+            )
+
+        if deformed_vertices.shape != (
+            HeadReconstructionBuilder.EXPECTED_CANONICAL_VERTICES,
+            3,
+        ):
+            raise RuntimeError(
+                "La Canonical Head deformata ha forma inattesa: "
+                f"{deformed_vertices.shape}."
+            )
+
         if not np.all(
             np.isfinite(deformed_face_vertices)
         ):
@@ -471,33 +516,6 @@ class HeadReconstructionBuilder:
                 "Il displacement V10 contiene valori non finiti."
             )
 
-        # --------------------------------------------------
-        # 6. Trasferimento del displacement alla Head
-        # --------------------------------------------------
-        #
-        # Il V10 engine mantiene il vincolo esatto sui 490
-        # vertici della Face Component e interpola il campo
-        # sui vertici esterni.
-        #
-        # --------------------------------------------------
-
-        full_displacement = (
-            v10_engine.transfer_displacement(
-                canonical_vertices=canonical_vertices,
-                face_global_indices=face_global_indices,
-                face_displacement=face_displacement,
-            )
-        )
-
-        if full_displacement.shape != (
-            HeadReconstructionBuilder.EXPECTED_CANONICAL_VERTICES,
-            3,
-        ):
-            raise RuntimeError(
-                "Il displacement completo V10 ha forma inattesa: "
-                f"{full_displacement.shape}."
-            )
-
         if not np.all(
             np.isfinite(full_displacement)
         ):
@@ -506,66 +524,22 @@ class HeadReconstructionBuilder:
                 "valori non finiti."
             )
 
-        # --------------------------------------------------
-        # 7. Costruzione della Canonical Head deformata
-        # --------------------------------------------------
-        #
-        # La Canonical Head completa deve essere portata
-        # nello stesso sistema di riferimento utilizzato
-        # dalla Face Component durante il Procrustes V10.
-        #
-        # Il displacement NRICP viene poi applicato
-        # alla Head già allineata.
-        #
-        # Questo riproduce la sequenza validata in V10-C3/C5:
-        #
-        #     Canonical Head
-        #          ↓
-        #     Procrustes
-        #          ↓
-        #     Head allineata
-        #          ↓
-        #     displacement V10
-        #          ↓
-        #     Head deformata
-        #
-        # --------------------------------------------------
-
-        aligned_head_vertices = (
-            HeadReconstructionBuilder._apply_v10_transform(
-                canonical_vertices,
-                procrustes_matrix,
-            )
-        )
-
-        deformed_vertices = (
-            aligned_head_vertices
-            + full_displacement
-        )
-
-        if deformed_vertices.shape != (
-            HeadReconstructionBuilder.EXPECTED_CANONICAL_VERTICES,
-            3,
-        ):
-            raise RuntimeError(
-                "La geometria V10 risultante ha dimensione inattesa: "
-                f"{deformed_vertices.shape}."
-            )
-
         if not np.all(
             np.isfinite(deformed_vertices)
         ):
             raise RuntimeError(
-                "La geometria V10 risultante contiene "
+                "La Canonical Head deformata contiene "
                 "valori non finiti."
             )
 
         # --------------------------------------------------
-        # 8. Vincolo esatto sulla Face Component
+        # 7. Vincolo esatto sulla Face Component
         # --------------------------------------------------
         #
-        # Il transfer deve conservare esattamente il displacement
-        # prodotto dalla V10 sui 490 vertici facciali.
+        # Il metodo V10 transfer_displacement() deve conservare
+        # esattamente il displacement prodotto sui 490 vertici facciali.
+        # Il controllo viene mantenuto anche a livello Builder come
+        # guardia architetturale supplementare.
         #
         # --------------------------------------------------
 
